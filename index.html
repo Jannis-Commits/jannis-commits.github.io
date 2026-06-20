@@ -69,7 +69,7 @@
             gap: 15px;
         }
 
-        input[type="text"] {
+        input[type="text"], textarea {
             width: 100%;
             padding: 16px;
             border-radius: 16px;
@@ -78,6 +78,11 @@
             font-size: 16px;
             background: transparent;
             color: var(--text-color);
+            font-family: inherit;
+        }
+
+        textarea {
+            resize: none;
         }
 
         button {
@@ -139,7 +144,6 @@
             white-space: pre-line;
         }
 
-        /* Styling für die Fehlermeldungen */
         .error-message {
             background-color: rgba(230, 57, 70, 0.1);
             color: var(--danger-color);
@@ -172,6 +176,8 @@
         <input type="file" id="image-input" accept="image/*" capture="environment" style="display: none;" onchange="previewImage(event)">
         
         <img id="preview" alt="Vorschau">
+        
+        <textarea id="details-input" placeholder="Zusatzdetails (optional, z.B. Defekte, unsichtbare Funktionen, Zustand, Speichergröße...)" rows="3"></textarea>
         
         <button id="scan-btn" onclick="scanObject()" class="hidden">Objekt scannen</button>
         
@@ -239,12 +245,21 @@
         const loader = document.getElementById("loader");
         const resultDiv = document.getElementById("result");
         const scanBtn = document.getElementById("scan-btn");
+        
+        // Wert des Detail-Felds auslesen
+        const additionalDetails = document.getElementById("details-input").value.trim();
 
         loader.style.display = "block";
         scanBtn.disabled = true;
         resultDiv.innerHTML = "Objekt wird per KI analysiert...";
 
-        const promptText = "Welches Objekt ist auf diesem Bild zu sehen? Schätze den aktuellen ungefähren Verkaufspreis (Gebrauchtpreis) auf eBay in Euro. Antworte kurz und übersichtlich. Nenne das erkannte Objekt, eine geschätzte Preisspanne in Fett (z.B. **20 - 40 €**) und gib 2 kurze Tipps für den erfolgreichen eBay-Verkauf.";
+        // Basis-Prompt
+        let promptText = "Welches Objekt ist auf diesem Bild zu sehen? Schätze den aktuellen ungefähren Verkaufspreis (Gebrauchtpreis) auf eBay in Euro. Antworte kurz und übersichtlich. Nenne das erkannte Objekt, eine geschätzte Preisspanne in Fett (z.B. **20 - 40 €**) und gib 2 kurze Tipps für den erfolgreichen eBay-Verkauf.";
+
+        // Wenn Details eingegeben wurden, hängen wir sie an den Prompt an
+        if (additionalDetails) {
+            promptText += `\n\nBeachte unbedingt diese vom Nutzer angegebenen Zusatzdetails über den Zustand oder nicht sichtbare Funktionen für deine Preiseinschätzung: "${additionalDetails}"`;
+        }
 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
@@ -264,7 +279,6 @@
                 })
             });
 
-            // --- FEHLER-ABFANG-LOGIK ---
             if (!response.ok) {
                 if (response.status === 429) {
                     resultDiv.innerHTML = `<div class="error-message">⚠️ <b>Zu schnell hintereinander!</b><br>Der kostenlose Tarif erlaubt max. 15 Bilder pro Minute. Warte kurz und tippe erneut auf Scannen.</div>`;
@@ -273,7 +287,7 @@
                 } else {
                     resultDiv.innerHTML = `<div class="error-message">❌ <b>Google-Serverfehler</b><br>Die KI ist gerade überlastet (Fehler ${response.status}). Bitte versuche es gleich noch einmal.</div>`;
                 }
-                return; // Stoppt die weitere Ausführung
+                return;
             }
 
             const data = await response.json();
