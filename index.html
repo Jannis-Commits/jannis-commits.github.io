@@ -254,7 +254,7 @@
         resultDiv.innerHTML = "Objekt wird per KI analysiert...";
 
         // Basis-Prompt
-        let promptText = "Welches Objekt ist auf diesem Bild zu sehen? Schätze den aktuellen ungefähren Verkaufspreis (Gebrauchtpreis) auf eBay in Euro. Antworte kurz und übersichtlich. Nenne das erkannte Objekt, eine geschätzte Preisspanne in Fett (z.B. **20 - 40 €**) und gib 2 kurze Tipps für den erfolgreichen eBay-Verkauf.";
+        let promptText = "Welches Objekt ist auf diesem Bild zu sehen? Schätze den aktuellen ungefähren Verkaufspreis (Gebrauchtpreis) auf eBay in Euro. Wenn du es weißt, wann das Modell des Objektes hergestellt wurde und ob es noch produziert wird. Antworte kurz und übersichtlich. Nenne das erkannte Objekt, eine geschätzte Preisspanne in Fett (z.B. **20 - 40 €**), wann und ob es noch produziert wird und gib 2 kurze Tipps für den erfolgreichen eBay-Verkauf.";
 
         // Wenn Details eingegeben wurden, hängen wir sie an den Prompt an
         if (additionalDetails) {
