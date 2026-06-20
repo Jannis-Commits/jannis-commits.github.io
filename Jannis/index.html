@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jannis' Projects</title>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #60a5fa;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: '-apple-system', BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            max-width: 600px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(to right, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-decoration: none;
+            color: inherit;
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-content h2 {
+            font-size: 1.4rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .card-content p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-action {
+            display: flex;
+            align-items: center;
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .card:hover .card-action {
+            color: var(--accent-hover);
+        }
+
+        .card-action svg {
+            margin-left: 0.5rem;
+            transition: transform 0.2s ease;
+        }
+
+        .card:hover .card-action svg {
+            transform: translateX(4px);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Jannis' Hub</h1>
+        <p>Übersicht meiner Projekte und Tools</p>
+    </header>
+
+    <main class="grid" id="project-grid">
+        <!-- Die Cards werden automatisch per JavaScript eingefügt -->
+    </main>
+
+    <script>
+        // HIER NEUE SEITEN EINFACH HINZUFÜGEN
+        const projects = [
+            {
+                title: "🎰 Gambling Simulator",
+                description: "Ein kleines Experiment rund um Wahrscheinlichkeiten und Glücksspiel.",
+                path: "Gambling" // Leitet weiter zu /Jannis/Gambling
+            },
+            {
+                title: "🃏 Blackjack",
+                description: "Das klassische Kartenspiel gegen den Dealer. Teste deine Taktik.",
+                path: "Blackjack" // Leitet weiter zu /Jannis/Blackjack
+            }
+            // Wenn du ein neues Projekt hast, einfach so erweitern:
+            // ,{
+            //     title: "🤖 Mein neues Tool",
+            //     description: "Eine kurze Beschreibung, was das Tool macht.",
+            //     path: "NeuesTool"
+            // }
+        ];
+
+        const grid = document.getElementById('project-grid');
+
+        // Dynamisches Generieren der HTML-Kacheln
+        projects.forEach(project => {
+            const card = document.createElement('a');
+            card.className = 'card';
+            // Nutzt relative Pfade, damit es auf GitHub Pages perfekt auflöst
+            card.href = `./${project.path}`; 
+
+            card.innerHTML = `
+                <div class="card-content">
+                    <h2>${project.title}</h2>
+                    <p>${project.description}</p>
+                </div>
+                <div class="card-action">
+                    Öffnen 
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                </div>
+            `;
+            grid.appendChild(card);
+        });
+    </script>
+</body>
+</html>
