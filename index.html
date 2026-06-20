@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>eBay Preis-Scanner (Gemini Free)</title>
+    <style>
+        :root {
+            --bg-color: #f4f6fa;
+            --card-bg: #ffffff;
+            --text-color: #000000;
+            --primary-color: #0377fc;
+            --danger-color: #e63946;
+            --radius: 24px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #0a0a0a;
+                --card-bg: #1c1c1e;
+                --text-color: #ffffff;
+                --primary-color: #3b82f6;
+            }
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 450px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            text-align: center;
+            margin-top: 20px;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+            font-size: 16px;
+            background: transparent;
+            color: var(--text-color);
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 16px;
+            border-radius: var(--radius);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        button:active {
+            opacity: 0.8;
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+            padding: 10px;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        #preview {
+            width: 100%;
+            border-radius: 16px;
+            display: none;
+            object-fit: cover;
+            max-height: 300px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .loader {
+            display: none;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #result {
+            font-size: 16px;
+            line-height: 1.5;
+            white-space: pre-line;
+        }
+
+        /* Styling für die Fehlermeldungen */
+        .error-message {
+            background-color: rgba(230, 57, 70, 0.1);
+            color: var(--danger-color);
+            padding: 15px;
+            border-radius: 16px;
+            border: 1px solid var(--danger-color);
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Wert-Schätzer</h1>
+    <div class="subtitle">Kostenloser Bild-Scan via Google Gemini</div>
+
+    <div id="api-section" class="card">
+        <h3>Google Gemini API Key</h3>
+        <p style="font-size: 14px; color: #777;">Hole dir einen kostenlosen Key auf aistudio.google.com. Er wird nur lokal im Browser gespeichert.</p>
+        <input type="text" id="api-key-input" placeholder="AIzaSy...">
+        <button onclick="saveApiKey()">Key speichern</button>
+    </div>
+
+    <div id="main-section" class="card hidden">
+        <label for="image-input" style="width: 100%;">
+            <div style="border: 2px dashed #ccc; padding: 30px; text-align: center; border-radius: 16px; cursor: pointer;">
+                📸 Objekt fotografieren / wählen
+            </div>
+        </label>
+        <input type="file" id="image-input" accept="image/*" capture="environment" style="display: none;" onchange="previewImage(event)">
+        
+        <img id="preview" alt="Vorschau">
+        
+        <button id="scan-btn" onclick="scanObject()" class="hidden">Objekt scannen</button>
+        
+        <div class="loader" id="loader"></div>
+        <div id="result"></div>
+
+        <button class="btn-secondary" onclick="resetApiKey()">API Key löschen</button>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const savedKey = localStorage.getItem("gemini_api_key");
+        if (savedKey) {
+            showMainSection();
+        }
+    });
+
+    function saveApiKey() {
+        const key = document.getElementById("api-key-input").value.trim();
+        if (key.length > 10) {
+            localStorage.setItem("gemini_api_key", key);
+            showMainSection();
+        } else {
+            alert("Bitte gib einen gültigen Gemini API Key ein.");
+        }
+    }
+
+    function resetApiKey() {
+        if(confirm("Möchtest du den API-Key wirklich löschen?")) {
+            localStorage.removeItem("gemini_api_key");
+            location.reload();
+        }
+    }
+
+    function showMainSection() {
+        document.getElementById("api-section").classList.add("hidden");
+        document.getElementById("main-section").classList.remove("hidden");
+    }
+
+    let base64Image = "";
+
+    function previewImage(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = document.getElementById("preview");
+            img.src = e.target.result;
+            img.style.display = "block";
+            
+            base64Image = e.target.result.split(",")[1];
+            
+            document.getElementById("scan-btn").classList.remove("hidden");
+            document.getElementById("result").innerHTML = "";
+        }
+        reader.readAsDataURL(file);
+    }
+
+    async function scanObject() {
+        const apiKey = localStorage.getItem("gemini_api_key");
+        if (!apiKey || !base64Image) return;
+
+        const loader = document.getElementById("loader");
+        const resultDiv = document.getElementById("result");
+        const scanBtn = document.getElementById("scan-btn");
+
+        loader.style.display = "block";
+        scanBtn.disabled = true;
+        resultDiv.innerHTML = "Objekt wird per KI analysiert...";
+
+        const promptText = "Welches Objekt ist auf diesem Bild zu sehen? Schätze den aktuellen ungefähren Verkaufspreis (Gebrauchtpreis) auf eBay in Euro. Antworte kurz und übersichtlich. Nenne das erkannte Objekt, eine geschätzte Preisspanne in Fett (z.B. **20 - 40 €**) und gib 2 kurze Tipps für den erfolgreichen eBay-Verkauf.";
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: promptText },
+                            { inlineData: { mimeType: "image/jpeg", data: base64Image } }
+                        ]
+                    }]
+                })
+            });
+
+            // --- FEHLER-ABFANG-LOGIK ---
+            if (!response.ok) {
+                if (response.status === 429) {
+                    resultDiv.innerHTML = `<div class="error-message">⚠️ <b>Zu schnell hintereinander!</b><br>Der kostenlose Tarif erlaubt max. 15 Bilder pro Minute. Warte kurz und tippe erneut auf Scannen.</div>`;
+                } else if (response.status === 400 || response.status === 403) {
+                    resultDiv.innerHTML = `<div class="error-message">🔑 <b>Falscher API Key!</b><br>Dein eingegebener Schlüssel ist ungültig. Bitte lösche ihn unten und hole dir einen neuen Key.</div>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error-message">❌ <b>Google-Serverfehler</b><br>Die KI ist gerade überlastet (Fehler ${response.status}). Bitte versuche es gleich noch einmal.</div>`;
+                }
+                return; // Stoppt die weitere Ausführung
+            }
+
+            const data = await response.json();
+            
+            if (data.error) {
+                resultDiv.innerHTML = `<div class="error-message">⚠️ <b>Fehler:</b> ${data.error.message}</div>`;
+            } else if (data.candidates && data.candidates[0].content.parts[0].text) {
+                const textResult = data.candidates[0].content.parts[0].text;
+                resultDiv.innerHTML = textResult.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+            } else {
+                resultDiv.innerHTML = "Das Objekt konnte nicht eindeutig analysiert werden. Bitte versuche es mit einem deutlicheren Foto.";
+            }
+
+        } catch (error) {
+            resultDiv.innerHTML = `<div class="error-message">🌐 <b>Keine Verbindung</b><br>Bitte überprüfe, ob dein Samsung-Handy mobiles Internet oder WLAN hat.</div>`;
+            console.error(error);
+        } finally {
+            loader.style.display = "none";
+            scanBtn.disabled = false;
+        }
+    }
+</script>
+
+</body>
+</html>
