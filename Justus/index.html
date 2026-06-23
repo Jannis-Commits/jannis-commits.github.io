@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Flappy Character Touch</title>
+<style>
+    body {
+        margin: 0;
+        overflow: hidden;
+        background: #4cc9f0;
+        touch-action: manipulation;
+        font-family: 'Arial', sans-serif;
+    }
+    canvas {
+        display: block;
+        margin: auto;
+        background: linear-gradient(to bottom, #118ab2, #06d6a0);
+    }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+// Canvas an Bildschirm anpassen
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+// Bild des Charakters laden
+const birdImg = new Image();
+birdImg.src = "character.png"; // Stelle sicher, dass das Bild im selben Ordner liegt!
+
+// Bird Einstellungen (Größe leicht erhöht, damit man das Gesicht gut erkennt)
+let bird = {
+    x: 80,
+    y: 200,
+    width: 50,
+    height: 50,
+    gravity: 0.6,
+    lift: -11,
+    velocity: 0
+};
+
+// Pipes & Spielvariablen
+let pipes = [];
+let frame = 0;
+let score = 0;
+let gameOver = false;
+
+// Steuerung
+function flap(e) {
+    if (e) {
+        if (e.type === "mousedown" && 'ontouchstart' in window) return;
+        e.preventDefault();
+    }
+
+    if (!gameOver) {
+        bird.velocity = bird.lift;
+    } else {
+        resetGame();
+    }
+}
+
+document.addEventListener("touchstart", flap, { passive: false });
+document.addEventListener("mousedown", flap);
+document.addEventListener("keydown", flap);
+
+// Reset
+function resetGame() {
+    bird.y = 200;
+    bird.velocity = 0;
+    pipes = [];
+    frame = 0;
+    score = 0;
+    gameOver = false;
+    requestAnimationFrame(draw);
+}
+
+// Game loop
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Bird Physik
+    bird.velocity += bird.gravity;
+    bird.y += bird.velocity;
+
+    // Charakter zeichnen
+    if (birdImg.complete && birdImg.naturalWidth !== 0) {
+        // Zeichnet dein hochgeladenes Bild
+        ctx.drawImage(birdImg, bird.x, bird.y, bird.width, bird.height);
+    } else {
+        // Schickes Fallback-Dreieck mit Zunge, falls das Bild noch lädt oder fehlt
+        ctx.fillStyle = "white";
+        ctx.beginPath();
+        ctx.moveTo(bird.x + bird.width / 2, bird.y);
+        ctx.lineTo(bird.x + bird.width, bird.y + bird.height);
+        ctx.lineTo(bird.x, bird.y + bird.height);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#ff4d6d";
+        ctx.fillRect(bird.x + bird.width / 2 - 5, bird.y + bird.height - 15, 10, 15); 
+    }
+
+    // Pipes erzeugen
+    if (frame % 90 === 0) {
+        let gap = canvas.height / 3.5; // Etwas großzügigerer Durchgang
+        let top = Math.random() * (canvas.height - gap - 150) + 50;
+
+        pipes.push({
+            x: canvas.width,
+            top: top,
+            bottom: top + gap,
+            width: 70,
+            passed: false
+        });
+    }
+
+    // Pipes bewegen und zeichnen
+    for (let i = pipes.length - 1; i >= 0; i--) {
+        let pipe = pipes[i];
+        pipe.x -= 3.5; // Geschwindigkeit
+
+        // Stylischer 3D-Farbverlauf für die Röhren (wie bei Mario)
+        let gradient = ctx.createLinearGradient(pipe.x, 0, pipe.x + pipe.width, 0);
+        gradient.addColorStop(0, "#1e601c");
+        gradient.addColorStop(0.3, "#40916c");
+        gradient.addColorStop(0.7, "#74c69d");
+        gradient.addColorStop(1, "#1e601c");
+        ctx.fillStyle = gradient;
+        ctx.strokeStyle = "#081c15";
+        ctx.lineWidth = 3;
+
+        // Obere Röhre
+        ctx.fillRect(pipe.x, 0, pipe.width, pipe.top);
+        ctx.strokeRect(pipe.x, -5, pipe.width, pipe.top + 5);
+
+        // Untere Röhre
+        ctx.fillRect(pipe.x, pipe.bottom, pipe.width, canvas.height - pipe.bottom);
+        ctx.strokeRect(pipe.x, pipe.bottom, pipe.width, canvas.height - pipe.bottom + 5);
+
+        // Kollisionsabfrage
+        if (
+            bird.x < pipe.x + pipe.width &&
+            bird.x + bird.width > pipe.x &&
+            (bird.y < pipe.top || bird.y + bird.height > pipe.bottom)
+        ) {
+            gameOver = true;
+        }
+
+        // Score erhöhen
+        if (!pipe.passed && pipe.x + pipe.width < bird.x) {
+            score++;
+            pipe.passed = true;
+        }
+
+        // Aus dem Array löschen
+        if (pipe.x + pipe.width < 0) {
+            pipes.splice(i, 1);
+        }
+    }
+
+    // Boden und Decke Kollision
+    if (bird.y + bird.height > canvas.height || bird.y < 0) {
+        gameOver = true;
+    }
+
+    // Score Text mit cooler Kontur
+    ctx.fillStyle = "white";
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 5;
+    ctx.font = "bold 32px Arial";
+    ctx.textBaseline = "top";
+    ctx.strokeText("Score: " + score, 20, 20);
+    ctx.fillText("Score: " + score, 20, 20);
+
+    // Game Over Screen
+    if (gameOver) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.5)"; // Dunkler Overlay-Effekt
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        
+        ctx.fillStyle = "#ff4d6d";
+        ctx.font = "bold 45px Arial";
+        ctx.strokeText("Game Over", canvas.width / 2, canvas.height / 2 - 30);
+        ctx.fillText("Game Over", canvas.width / 2, canvas.height / 2 - 30);
+
+        ctx.fillStyle = "white";
+        ctx.font = "bold 24px Arial";
+        ctx.strokeText("Tippen zum Neustart", canvas.width / 2, canvas.height / 2 + 30);
+        ctx.fillText("Tippen zum Neustart", canvas.width / 2, canvas.height / 2 + 30);
+        
+        ctx.textAlign = "left"; // Reset für den Score oben links beim Neustart
+        return;
+    }
+
+    frame++;
+    requestAnimationFrame(draw);
+}
+
+// Erster Spielstart
+draw();
+</script>
+
+</body>
+</html>
