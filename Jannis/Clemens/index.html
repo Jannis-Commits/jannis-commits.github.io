@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Casino PRO iPad</title>
+
+<style>
+body {
+    margin:0;
+    font-family: Arial;
+    background: radial-gradient(circle,#0e3b2e,#050c0a);
+    color:white;
+    text-align:center;
+}
+
+h1 { margin:10px; }
+
+.panel { display:none; padding:10px; }
+.active { display:block; }
+
+.tabs button {
+    margin:5px;
+    padding:12px;
+    font-size:16px;
+    background:gold;
+    border:none;
+    border-radius:10px;
+}
+
+.card {
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+    padding:10px;
+    margin:10px;
+    border-radius:12px;
+}
+
+canvas {
+    background:#111;
+    border-radius:50%;
+    border:5px solid gold;
+}
+
+.chips {
+    display:flex;
+    justify-content:center;
+    flex-wrap:wrap;
+    gap:10px;
+    margin:10px;
+}
+
+.chip {
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    font-weight:bold;
+    border:2px solid white;
+    touch-action: manipulation;
+    cursor:pointer;
+}
+
+button {
+    padding:12px;
+    margin:5px;
+    font-size:16px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+}
+
+.small { font-size:14px; opacity:0.8; }
+</style>
+</head>
+
+<body>
+
+<h1>ð° Casino PRO iPad</h1>
+
+<div class="card">
+ð° Geld: <span id="bal">1000</span>â¬ |
+ð Level: <span id="lvl">1</span> |
+â­ XP: <span id="xp">0</span>
+</div>
+
+<div class="tabs">
+<button onclick="show('roulette')">Roulette</button>
+<button onclick="show('blackjack')">Blackjack</button>
+<button onclick="show('slots')">Slots</button>
+</div>
+
+---
+
+# ð¡ ROULETTE
+<div id="roulette" class="panel active">
+
+<canvas id="wheel" width="300" height="300"></canvas>
+
+<div class="small">Tippe Chips â dann spielen</div>
+
+<div class="chips">
+<button class="chip" onclick="setBet(10)">10</button>
+<button class="chip" onclick="setBet(50)">50</button>
+<button class="chip" onclick="setBet(100)">100</button>
+<button class="chip" onclick="setBet(250)">250</button>
+</div>
+
+<button onclick="spin('red')">ð´ ROT</button>
+<button onclick="spin('black')">â« SCHWARZ</button>
+
+<p id="rres"></p>
+
+</div>
+
+---
+
+# ð BLACKJACK
+<div id="blackjack" class="panel card">
+
+<div id="dealer"></div>
+<div id="player"></div>
+
+<button onclick="bjStart()">Start</button>
+<button onclick="bjHit()">Hit</button>
+<button onclick="bjStand()">Stand</button>
+
+<p id="bjres"></p>
+
+</div>
+
+---
+
+# ð° SLOTS
+<div id="slots" class="panel card">
+
+<div style="font-size:40px" id="reels">ð° ð° ð°</div>
+
+<button onclick="slot()">SPIN</button>
+
+<p id="sres"></p>
+
+</div>
+
+<script>
+
+/* ======================
+   CORE SYSTEM
+====================== */
+
+let balance = +localStorage.getItem("bal") || 1000;
+let xp = +localStorage.getItem("xp") || 0;
+let level = +localStorage.getItem("lvl") || 1;
+
+let bet = 10;
+
+function save(){
+    localStorage.setItem("bal",balance);
+    localStorage.setItem("xp",xp);
+    localStorage.setItem("lvl",level);
+}
+
+function update(){
+    document.getElementById("bal").innerText = balance;
+    document.getElementById("xp").innerText = xp;
+    document.getElementById("lvl").innerText = level;
+}
+update();
+
+/* ======================
+   LEVEL SYSTEM
+====================== */
+
+function addXP(v){
+    xp += v;
+    if(xp >= level*100){
+        xp = 0;
+        level++;
+        alert("LEVEL UP! ð");
+    }
+    save(); update();
+}
+
+/* ======================
+   SOUND
+====================== */
+
+function beep(f){
+    try{
+        let c = new AudioContext();
+        let o = c.createOscillator();
+        o.frequency.value=f;
+        o.connect(c.destination);
+        o.start();
+        setTimeout(()=>o.stop(),80);
+    }catch(e){}
+}
+
+/* ======================
+   NAV
+====================== */
+
+function show(id){
+    document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+}
+
+/* ======================
+   ROULETTE
+====================== */
+
+function spin(type){
+
+    let n = Math.floor(Math.random()*37);
+    let win = false;
+
+    if(type==="red") win = n!==0 && n%2===1;
+    if(type==="black") win = n!==0 && n%2===0;
+
+    if(win){
+        balance += bet;
+        addXP(20);
+        beep(600);
+        document.getElementById("rres").innerText="Zahl: "+n+" ð";
+    } else {
+        balance -= bet;
+        addXP(5);
+        beep(200);
+        document.getElementById("rres").innerText="Zahl: "+n+" ð";
+    }
+
+    save(); update();
+}
+
+/* ======================
+   BLACKJACK
+====================== */
+
+let p=[], d=[];
+
+function c(){ return Math.floor(Math.random()*11)+1; }
+
+function bjStart(){
+    p=[c(),c()];
+    d=[c()];
+    render();
+}
+
+function bjHit(){
+    p.push(c());
+    render();
+}
+
+function bjStand(){
+
+    while(d.reduce((a,b)=>a+b)<17){
+        d.push(c());
+    }
+
+    let ps=p.reduce((a,b)=>a+b);
+    let ds=d.reduce((a,b)=>a+b);
+
+    if((ps>ds && ps<=21) || ds>21){
+        balance += bet*2;
+        addXP(30);
+        beep(700);
+        document.getElementById("bjres").innerText="Gewonnen ð";
+    }else{
+        balance -= bet;
+        addXP(10);
+        beep(200);
+        document.getElementById("bjres").innerText="Verloren ð";
+    }
+
+    save(); update();
+}
+
+function render(){
+    document.getElementById("player").innerText="Du: "+p.join(",");
+    document.getElementById("dealer").innerText="Dealer: "+d.join(",");
+}
+
+/* ======================
+   SLOTS
+====================== */
+
+function slot(){
+
+    let a=Math.floor(Math.random()*7);
+    let b=Math.floor(Math.random()*7);
+    let c=Math.floor(Math.random()*7);
+
+    document.getElementById("reels").innerText="ð° "+a+" "+b+" "+c;
+
+    if(a===b && b===c){
+        balance += bet*10;
+        addXP(50);
+        beep(800);
+        document.getElementById("sres").innerText="JACKPOT! ð";
+    }else{
+        balance -= bet;
+        addXP(10);
+        beep(200);
+        document.getElementById("sres").innerText="Try again";
+    }
+
+    save(); update();
+}
+
+</script>
+
+</body>
+</html>
