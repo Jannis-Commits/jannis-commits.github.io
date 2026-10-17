@@ -1,4 +1,5 @@
 // LLM-Produkte: Chat-Website, API, Open Source. Alle Werte frei anpassbar.
+// Betrieben werden sie auf Maschinen mit der Rolle "Chat" bzw. "API" (Infra-Tab).
 
 // Gesamtmarkt Chat-Nutzer (alle Anbieter): marketMax / (1 + exp(-(Jahr - mid) * k)) + base
 export const CHAT = {
@@ -45,8 +46,6 @@ export const OPEN_SOURCE = {
 };
 
 export const INFERENCE = {
-  shares: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
-  defaultShare: 0.3,
   churnPerOverload: 0.15,     // bei 200 % Last verlierst du 15 % der Nutzer pro Woche
   repLossOverload: 0.5,
 };

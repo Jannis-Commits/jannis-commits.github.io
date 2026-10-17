@@ -3,7 +3,7 @@ import { WEEKS_PER_YEAR, START } from '../../config/formulas.js';
 const nf = (d) => new Intl.NumberFormat('de-DE', { maximumFractionDigits: d, minimumFractionDigits: 0 });
 
 export function money(v) {
-  const sign = v < 0 ? '−' : '';
+  const sign = v < 0 && Math.round(Math.abs(v)) > 0 ? '−' : '';
   const a = Math.abs(v);
   if (a >= 1e9) return `${sign}${nf(1).format(a / 1e9)} Mrd. $`;
   if (a >= 1e6) return `${sign}${nf(1).format(a / 1e6)} Mio. $`;
@@ -45,3 +45,38 @@ export function date(week) {
 }
 
 export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+export function gb(v) {
+  if (v > 0 && v < 1) return `${nf(0).format(Math.max(1, v * 1000))} MB`;
+  if (v >= 1e6) return `${nf(1).format(v / 1e6)} PB`;
+  if (v >= 1000) return `${nf(1).format(v / 1000)} TB`;
+  return `${nf(v < 10 ? 1 : 0).format(v)} GB`;
+}
+
+export const tb = (v) => gb(v * 1000);
+
+export function kw(v) {
+  if (v >= 1000) return `${nf(1).format(v / 1000)} MW`;
+  if (v < 1) return `${nf(0).format(v * 1000)} W`;
+  return `${nf(1).format(v)} kW`;
+}
+
+export function tflops(v) {
+  if (v >= 1e6) return `${nf(1).format(v / 1e6)} EFLOP/s`;
+  if (v >= 1000) return `${nf(1).format(v / 1000)} PFLOP/s`;
+  return `${nf(v < 10 ? 1 : 0).format(v)} TFLOP/s`;
+}
+
+// Kurz-Schreibweise für Parameter: 7B, 175B, 1,2T
+export function short(n) {
+  if (n >= 1e12) return `${nf(1).format(n / 1e12)}T`;
+  if (n >= 1e9) return `${nf(n < 1e10 ? 1 : 0).format(n / 1e9)}B`;
+  if (n >= 1e6) return `${nf(0).format(n / 1e6)}M`;
+  if (n >= 1e3) return `${nf(0).format(n / 1e3)}K`;
+  return nf(0).format(n);
+}
+
+export function weeks(n) {
+  if (!isFinite(n)) return '∞';
+  return `${nf(0).format(n)} Wo`;
+}

@@ -1,5 +1,6 @@
 // Rivalen-Releases. year = echtes Jahr (wird über WEEKS_PER_YEAR auf Runden gestaucht).
 // scores auf derselben Skala wie deine LLMs (0–100, AGI ≈ 100).
+// open = Gewichte frei herunterladbar (params, moe = aktiver Anteil). Kannst du fine-tunen und betreiben.
 
 export const COMPANIES = {
   google: { name: 'Google', color: '#4285f4' },
@@ -9,6 +10,8 @@ export const COMPANIES = {
   anthropic: { name: 'Anthropic', color: '#d97757' },
   xai: { name: 'xAI', color: '#111111' },
   deepseek: { name: 'DeepSeek', color: '#4d6bfe' },
+  mistral: { name: 'Mistral', color: '#fa520f' },
+  alibaba: { name: 'Alibaba (Qwen)', color: '#615ced' },
 };
 
 const s = (language, coding, math, reasoning) => ({ language, coding, math, reasoning });
@@ -24,19 +27,23 @@ export const RIVAL_RELEASES = [
   { company: 'deepmind', name: 'Gopher', year: 2021.95, scores: s(36, 16, 14, 26) },
   { company: 'google', name: 'PaLM', year: 2022.3, scores: s(58, 40, 30, 45) },
   { company: 'openai', name: 'ChatGPT', year: 2022.9, scores: s(62, 45, 30, 45) },
-  { company: 'meta', name: 'Llama', year: 2023.15, scores: s(52, 30, 22, 38) },
+  { company: 'meta', name: 'Llama 65B', year: 2023.15, scores: s(52, 30, 22, 38), open: true, params: 6.5e10 },
   { company: 'openai', name: 'GPT-4', year: 2023.2, scores: s(78, 68, 55, 70) },
   { company: 'anthropic', name: 'Claude 2', year: 2023.55, scores: s(76, 60, 48, 64) },
-  { company: 'meta', name: 'Llama 2', year: 2023.55, scores: s(58, 35, 28, 44) },
+  { company: 'meta', name: 'Llama 2 70B', year: 2023.55, scores: s(58, 35, 28, 44), open: true, params: 7e10 },
+  { company: 'mistral', name: 'Mistral 7B', year: 2023.75, scores: s(48, 32, 22, 36), open: true, params: 7.3e9 },
   { company: 'xai', name: 'Grok-1', year: 2023.85, scores: s(62, 50, 40, 52) },
   { company: 'google', name: 'Gemini 1.0', year: 2023.95, scores: s(77, 66, 55, 68) },
+  { company: 'mistral', name: 'Mixtral 8x7B', year: 2023.95, scores: s(64, 50, 40, 54), open: true, params: 4.67e10, moe: 0.28 },
   { company: 'anthropic', name: 'Claude 3 Opus', year: 2024.2, scores: s(82, 74, 62, 76) },
   { company: 'openai', name: 'GPT-4o', year: 2024.37, scores: s(83, 76, 64, 76) },
   { company: 'anthropic', name: 'Claude 3.5 Sonnet', year: 2024.47, scores: s(84, 82, 66, 78) },
-  { company: 'meta', name: 'Llama 3.1 405B', year: 2024.56, scores: s(80, 72, 62, 72) },
+  { company: 'meta', name: 'Llama 3.1 8B', year: 2024.56, scores: s(60, 50, 42, 50), open: true, params: 8e9 },
+  { company: 'meta', name: 'Llama 3.1 405B', year: 2024.56, scores: s(80, 72, 62, 72), open: true, params: 4.05e11 },
+  { company: 'alibaba', name: 'Qwen2.5 72B', year: 2024.72, scores: s(80, 78, 74, 74), open: true, params: 7.27e10 },
   { company: 'openai', name: 'o1', year: 2024.7, scores: s(82, 84, 85, 86) },
-  { company: 'deepseek', name: 'DeepSeek-V3', year: 2024.99, scores: s(82, 80, 75, 78) },
-  { company: 'deepseek', name: 'DeepSeek-R1', year: 2025.05, scores: s(82, 82, 86, 86) },
+  { company: 'deepseek', name: 'DeepSeek-V3', year: 2024.99, scores: s(82, 80, 75, 78), open: true, params: 6.71e11, moe: 0.055 },
+  { company: 'deepseek', name: 'DeepSeek-R1', year: 2025.05, scores: s(82, 82, 86, 86), open: true, params: 6.71e11, moe: 0.055 },
   { company: 'xai', name: 'Grok 3', year: 2025.13, scores: s(84, 82, 84, 84) },
   { company: 'anthropic', name: 'Claude 3.7 Sonnet', year: 2025.15, scores: s(86, 88, 82, 85) },
   { company: 'google', name: 'Gemini 2.5 Pro', year: 2025.23, scores: s(88, 86, 88, 88) },
@@ -55,8 +62,8 @@ export const FUTURE = {
     anthropic: { prefix: 'Claude ', version: 4, step: 0.5, every: 0.5, phase: 0.0, offset: 0.5 },
     google: { prefix: 'Gemini ', version: 3, step: 0.5, every: 0.5, phase: 0.35, offset: 0 },
     xai: { prefix: 'Grok ', version: 4, step: 1, every: 0.75, phase: 0.2, offset: -1.5 },
-    deepseek: { prefix: 'DeepSeek-V', version: 4, step: 1, every: 0.75, phase: 0.45, offset: -2.5 },
-    meta: { prefix: 'Llama ', version: 4, step: 1, every: 1, phase: 0.3, offset: -5 },
+    deepseek: { prefix: 'DeepSeek-V', version: 4, step: 1, every: 0.75, phase: 0.45, offset: -2.5, open: { params: 7e11, growth: 1.4, moe: 0.05 } },
+    meta: { prefix: 'Llama ', version: 4, step: 1, every: 1, phase: 0.3, offset: -5, open: { params: 4e11, growth: 1.6, moe: 0.05 } },
   },
   // Stärken je Firma (wird auf den Gesamt-Score addiert)
   bias: {
