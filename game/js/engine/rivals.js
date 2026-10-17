@@ -11,7 +11,9 @@ function futureReleases() {
       const v = f.version + i * f.step;
       const scores = {};
       for (const [k, b] of Object.entries(FUTURE.bias[company])) scores[k] = Math.min(100, base + b);
-      out.push({ company, name: `${f.prefix}${Number.isInteger(v) ? v : v.toFixed(1)}`, year: y, scores });
+      const rel = { company, name: `${f.prefix}${Number.isInteger(v) ? v : v.toFixed(1)}`, year: y, scores };
+      if (f.open) Object.assign(rel, { open: true, params: Math.round(f.open.params * Math.pow(f.open.growth, i) / 1e9) * 1e9, moe: f.open.moe });
+      out.push(rel);
     }
   }
   return out;
@@ -43,13 +45,18 @@ export function tickRivals(state, events) {
 }
 
 // Rangliste: Rivalen + eigene LLMs, sortiert nach Gesamt oder einer Fähigkeit
+// Herunterladbare Open-Weight-Modelle (veröffentlicht, Transformer erforscht)
+export function openReleases(state) {
+  return releasedRivals(state).filter((r) => r.open).reverse();
+}
+
 export function leaderboard(state, key = 'score') {
   const rows = releasedRivals(state).map((r) => ({
     name: r.name, owner: r.companyName, color: COMPANIES[r.company].color, mine: false,
     score: r.score, ...r.scores,
   }));
   for (const m of state.models) {
-    if (m.task === 'llm' && m.status === 'ready') {
+    if (m.task === 'llm' && m.status === 'ready' && m.evaluated && m.origin !== 'open') {
       rows.push({ name: m.name, owner: 'Du', color: '#2563eb', mine: true, score: m.score, ...m.skills });
     }
   }

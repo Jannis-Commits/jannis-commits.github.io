@@ -1,7 +1,8 @@
 import { CHAT, API, OPEN_SOURCE, INFERENCE, USEFULNESS } from '../../config/products.js';
-import { MOE, QUANT } from '../../config/formulas.js';
+import { COMPUTE } from '../../config/formulas.js';
 import { gameYear } from '../util/format.js';
-import { weeklyCompute } from './company.js';
+import { allMachines, machineStats } from './hardware.js';
+import { serveRate } from './memory.js';
 import { llmShare } from './rivals.js';
 
 // ---------- Märkte ----------
@@ -17,13 +18,9 @@ export function apiRefPrice(state) {
 
 export const llmModels = (state) => state.models.filter((m) => m.task === 'llm' && m.status === 'ready');
 const model = (state, id) => state.models.find((m) => m.id === id && m.status === 'ready');
-export const chatModel = (state) => model(state, state.chat.modelId);
+export const chatModel = (state) => { const m = model(state, state.chat.modelId); return m?.chat ? m : undefined; };
 export const apiModel = (state) => model(state, state.api.modelId);
-
-// Aktive Parameter pro Token (MoE und Quantisierung sparen Inferenz)
-export function servingParams(m) {
-  return m.params * (m.arch === 'moe' ? MOE.activeShare : 1) * (m.bits ? QUANT[m.bits].hosting : 1);
-}
+export const productModel = (state, kind) => (kind === 'chat' ? chatModel(state) : apiModel(state));
 
 // ---------- Ziele (wohin sich Nutzer/Nachfrage bewegen) ----------
 
@@ -48,56 +45,62 @@ export function apiTarget(state) {
   return Math.min(apiMarket(state), apiMarket(state) * llmShare(state, s) * usefulness(s) * priceFactor);
 }
 
-// ---------- Compute-Aufteilung ----------
+// ---------- Kapazität: Maschinen mit Rolle "chat" bzw. "api" ----------
 
-export const productsActive = (state) => !!(chatModel(state) || apiModel(state));
-
-export function inferenceCapacity(state) {
-  return productsActive(state) ? weeklyCompute(state) * state.inferenceShare : 0;
+export function capacity(state, kind) {
+  const m = productModel(state, kind);
+  if (!m) return { tokens: 0, machines: 0, fits: true };
+  const prec = (m.bits || 16) <= 8 ? 'fp8' : 'fp16';
+  let tokS = 0, machines = 0, fits = false, anyMachine = false;
+  for (const g of allMachines(state).filter((x) => x.role === kind)) {
+    anyMachine = true;
+    const r = serveRate(state, m, machineStats(state, g, prec));
+    if (r.fits) fits = true;
+    tokS += r.tokS * g.count;
+    machines += g.count;
+  }
+  return { tokens: tokS * COMPUTE.secondsPerWeek, machines, fits: fits || !anyMachine, anyMachine };
 }
 
-export function trainingCompute(state) {
-  return weeklyCompute(state) * (productsActive(state) ? 1 - state.inferenceShare : 1);
+export function demand(state, kind) {
+  if (kind === 'chat') return chatModel(state) ? state.chat.free * CHAT.tokensFree + state.chat.paid * CHAT.tokensPaid : 0;
+  return apiModel(state) ? state.api.tokens : 0;
 }
 
-export function inferenceDemand(state) {
-  let flops = 0;
-  const c = chatModel(state), a = apiModel(state);
-  if (c) flops += (state.chat.free * CHAT.tokensFree + state.chat.paid * CHAT.tokensPaid) * 2 * servingParams(c);
-  if (a) flops += state.api.tokens * 2 * servingParams(a);
-  return flops;
+export function load(state, kind) {
+  const d = demand(state, kind);
+  if (!d) return 0;
+  const cap = capacity(state, kind).tokens;
+  return cap > 0 ? d / cap : Infinity;
 }
 
-export function load(state) {
-  const demand = inferenceDemand(state);
-  if (!demand) return 0;
-  const cap = inferenceCapacity(state);
-  return cap > 0 ? demand / cap : Infinity;
-}
+const servedShare = (l) => Math.min(1, 1 / Math.max(l, 1e-9));
 
 // ---------- Einnahmen ----------
 
 export function productRevenue(state) {
-  const served = Math.min(1, 1 / Math.max(load(state), 1e-9));
-  const chat = chatModel(state) ? state.chat.paid * state.chat.price / 4.33 : 0;
-  const api = apiModel(state) ? state.api.tokens / 1e6 * state.api.price : 0;
-  return { chat: chat * served, api: api * served, served, total: (chat + api) * served };
+  const chat = chatModel(state) ? (state.chat.paid * state.chat.price) / 4.33 * servedShare(load(state, 'chat')) : 0;
+  const api = apiModel(state) ? (state.api.tokens / 1e6) * state.api.price * servedShare(load(state, 'api')) : 0;
+  return { chat, api, total: chat + api };
 }
 
 export const totalUsers = (state) => (chatModel(state) ? state.chat.free + state.chat.paid : 0);
+export const productsActive = (state) => !!(chatModel(state) || apiModel(state));
 
 // ---------- Woche simulieren ----------
 
 export function tickProducts(state, events) {
-  const l = load(state);
-  const overload = Math.max(0, l - 1);
-  const churn = Math.min(0.9, overload * INFERENCE.churnPerOverload);
+  let worst = 0;
+  const churn = (kind) => {
+    const l = load(state, kind);
+    worst = Math.max(worst, l);
+    return Math.min(0.9, Math.max(0, l - 1) * INFERENCE.churnPerOverload);
+  };
 
   if (chatModel(state)) {
-    const target = chatTarget(state);
+    const c = churn('chat');
     const users = state.chat.free + state.chat.paid;
-    let next = users + (target - users) * CHAT.growth;
-    next *= 1 - churn;
+    const next = (users + (chatTarget(state) - users) * CHAT.growth) * (1 - c);
     const conv = conversion(state.chat.price);
     state.chat.paid = next * conv;
     state.chat.free = next * (1 - conv);
@@ -106,16 +109,17 @@ export function tickProducts(state, events) {
   }
 
   if (apiModel(state)) {
+    const c = churn('api');
     state.api.tokens += (apiTarget(state) - state.api.tokens) * API.growth;
-    state.api.tokens *= 1 - churn;
+    state.api.tokens *= 1 - c;
   } else {
     state.api.tokens = 0;
   }
 
-  if (overload > 0) {
+  if (worst > 1) {
     state.rep = Math.max(0, state.rep - INFERENCE.repLossOverload);
     if (!state.overloadWarned) {
-      events.push({ type: 'warn', text: `Server überlastet (${Math.round(l * 100)} %)! Mehr Compute für Inferenz oder mehr Hardware.`, important: true });
+      events.push({ type: 'warn', text: `Server überlastet (${worst === Infinity ? '∞' : Math.round(worst * 100)} %)! Mehr Maschinen auf Chat/API stellen.`, important: true });
       state.overloadWarned = true;
     }
   } else {
@@ -125,21 +129,23 @@ export function tickProducts(state, events) {
 
 // ---------- Aktionen ----------
 
-export function setChatModel(state, id) {
-  state.chat.modelId = id;
-}
-
-export function setApiModel(state, id) {
-  state.api.modelId = id;
+export function setProductModel(state, kind, id) {
+  (kind === 'chat' ? state.chat : state.api).modelId = id;
 }
 
 export const setChatPrice = (state, p) => { state.chat.price = p; };
 export const setApiPrice = (state, p) => { state.api.price = p; };
-export const setInferenceShare = (state, v) => { state.inferenceShare = Math.max(0, Math.min(0.9, v)); };
+
+export function canOpenSource(state, m) {
+  if (!m || m.status !== 'ready') return 'Modell nicht fertig';
+  if (m.origin !== 'own') return 'Nur eigene Modelle';
+  if (state.openSourced.includes(m.id)) return 'Schon veröffentlicht';
+  return null;
+}
 
 export function openSource(state, id) {
   const m = model(state, id);
-  if (!m || state.openSourced.includes(id)) return null;
+  if (canOpenSource(state, m)) return null;
   state.openSourced.push(id);
   const gain = m.score * OPEN_SOURCE.repPerScore;
   state.rep = Math.min(100, state.rep + gain);

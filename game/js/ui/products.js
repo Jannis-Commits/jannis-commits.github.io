@@ -1,95 +1,87 @@
-import { CHAT, API, INFERENCE, OPEN_SOURCE } from '../../config/products.js';
+import { CHAT, API } from '../../config/products.js';
+import { TASKS } from '../../config/tasks.js';
 import * as F from '../util/format.js';
-import { btn, kv, h2, chip, bar, empty } from './components.js';
-import { effects } from '../engine/research.js';
+import { btn, kv, h2, chip, bar, empty, row, list, note } from './components.js';
+import { has } from '../engine/research.js';
 import { llmShare } from '../engine/rivals.js';
+import { shownScore } from '../engine/training.js';
+import { minServeGb } from '../engine/memory.js';
+import { appIncome } from '../engine/market.js';
+import { hostingCost } from '../engine/company.js';
 import {
-  llmModels, chatModel, apiModel, chatTarget, apiTarget, conversion, productRevenue, load,
-  inferenceCapacity, inferenceDemand, apiRefPrice, chatMarket,
+  llmModels, chatModel, apiModel, chatTarget, apiTarget, conversion, productRevenue, load, capacity, demand, apiRefPrice, chatMarket,
 } from '../engine/products.js';
+import { stageBadges } from './lab.js';
 
-function loadChip(l) {
-  if (!l) return chip('Keine Last');
-  return chip(`Serverlast ${Math.round(l * 100)} %`, l > 1 ? 'red' : l > 0.8 ? 'amber' : 'green');
+function loadBlock(state, kind) {
+  const cap = capacity(state, kind), l = load(state, kind), d = demand(state, kind);
+  const m = kind === 'chat' ? chatModel(state) : apiModel(state);
+  let warn = '';
+  if (!cap.anyMachine) warn = note(`Keine Maschine mit Rolle „${kind === 'chat' ? 'Chat' : 'API'}“. Infra → Maschine → Rolle.`, 'red');
+  else if (!cap.fits) warn = note(`Das Modell passt nicht in den VRAM dieser Maschinen (braucht ≥ ${F.gb(minServeGb(state, m))} pro GPU, oder Tensor-Parallel). Quantisieren oder größere GPUs!`, 'red');
+  return `<div class="label">Server (${cap.machines} Maschine(n))</div>
+    ${kv('Bedarf', `${F.count(d)} Tokens/Wo`)}${kv('Kapazität', `${F.count(cap.tokens)} Tokens/Wo`)}
+    ${bar(Math.min(1, l || 0), false, l > 1 ? 'red' : l > 0.8 ? 'amber' : '')}
+    <div class="chips">${l ? chip(`Last ${l === Infinity ? '∞' : Math.round(l * 100) + ' %'}`, l > 1 ? 'red' : l > 0.8 ? 'amber' : 'green') : chip('Keine Last')}
+      ${btn('Maschinen', 'seg', { tab: 'infra', id: 'machines' }, { cls: 'ghost small' })}</div>${warn}`;
 }
 
 function modelLine(m, kind) {
-  return `<button class="opt ${m ? 'on' : ''}" data-act="pickModel" data-kind="${kind}">
-    <span class="ico">🧠</span><span class="grow"><b>${m ? F.esc(m.name) : 'Kein Modell gewählt'}</b><br>
-    <span class="sub">${m ? `Score ${Math.round(m.score)} · ${F.params(m.params)}${m.bits ? ` · ${m.bits} Bit` : ''}` : 'Tippen zum Auswählen'}</span></span>
+  return `<button class="opt ${m ? 'on' : ''}" data-act="openSheet" data-kind="pickModel" data-pick="${kind}">
+    <span class="ico">🧠</span><span class="grow"><b>${m ? F.esc(m.name) : 'Kein Modell gewählt'}</b> ${m ? stageBadges(m) : ''}<br>
+    <span class="sub">${m ? `Score ${m.evaluated ? '' : '~'}${Math.round(shownScore(m))} · ${F.short(m.params)}` : 'Tippen zum Auswählen'}</span></span>
     <span class="sub">ändern ›</span></button>`;
 }
 
 function priceSeg(prices, current, act, fmt) {
-  return `<div class="seg" style="flex-wrap:wrap">${prices.map((p) =>
-    `<button class="${p === current ? 'on' : ''}" style="flex:1 0 22%" data-act="${act}" data-v="${p}">${fmt(p)}</button>`).join('')}</div>`;
+  return `<div class="seg wrap">${prices.map((p) =>
+    `<button class="${p === current ? 'on' : ''}" data-act="${act}" data-v="${p}">${fmt(p)}</button>`).join('')}</div>`;
 }
 
 export function productsView(state) {
   const llms = llmModels(state);
-  if (!llms.length) return empty('Produkte gibt es für Sprachmodelle (LLMs). Erforsche „Transformer“ und trainiere dein erstes LLM.');
-
   const rev = productRevenue(state);
-  const l = load(state);
-  const chatOk = effects(state).features.has('chat');
   const cm = chatModel(state), am = apiModel(state);
-  const share = INFERENCE.shares.reduce((b, v) => (Math.abs(v - state.inferenceShare) < Math.abs(b - state.inferenceShare) ? v : b));
+  const apps = Object.entries(state.apps).map(([t, id]) => state.models.find((m) => m.id === id)).filter(Boolean);
+  const appRows = apps.map((m) => row({ icon: TASKS[m.task].icon, title: F.esc(m.name), sub: `${F.money(appIncome(state, m))}/Wo − Hosting ${F.money(hostingCost(m))}/Wo`, act: 'openSheet', data: { kind: 'model', id: m.id } }));
 
-  return `
-    ${h2('Server & Inferenz')}
-    <div class="card"><div class="row"><div class="grow"><div class="title">Compute für Inferenz: ${F.pct(state.inferenceShare)}</div>
-      <div class="sub">Der Rest geht ins Training. Gilt nur, solange ein Produkt läuft.</div></div></div>
-      ${priceSeg(INFERENCE.shares, share, 'infShare', (v) => `${Math.round(v * 100)} %`)}
-      ${kv('Bedarf', `${F.flops(inferenceDemand(state))}/Wo`)}
-      ${kv('Kapazität', `${F.flops(inferenceCapacity(state))}/Wo`)}
-      ${bar(Math.min(1, l || 0))}
-      <div class="chips">${loadChip(l)}${rev.served < 1 ? chip(`Nur ${F.pct(rev.served)} der Anfragen bedient`, 'red') : ''}</div>
-    </div>
-
+  const llmPart = !llms.length ? empty('Chat & API gibt es für Sprachmodelle. Erforsche „Transformer“ und trainiere ein LLM – oder lade ein Open-Weight-Modell.') : `
     ${h2('Chat-Website')}
     <div class="card ${cm ? 'hl' : ''}">
-      ${chatOk ? `${modelLine(cm, 'chat')}
+      ${has(state, 'sft') || llms.some((m) => m.chat) ? `${modelLine(cm, 'chat')}
         <div class="label">Abo-Preis pro Monat</div>
         ${priceSeg(CHAT.prices, state.chat.price, 'chatPrice', (p) => (p ? `${p} $` : 'Gratis'))}
-        ${cm ? `${kv('Free-Nutzer', F.count(Math.round(state.chat.free)))}
-          ${kv('Zahlende Nutzer', `${F.count(Math.round(state.chat.paid))} (${F.pct(conversion(state.chat.price), 1)})`)}
+        ${cm ? `${kv('Nutzer (frei / zahlend)', `${F.count(Math.round(state.chat.free))} / ${F.count(Math.round(state.chat.paid))}`)}
           ${kv('Ziel-Nutzer', F.count(Math.round(chatTarget(state))))}
-          ${kv('Marktanteil', F.pct(llmShare(state, cm.score), 1))}
-          ${kv('Markt gesamt', `${F.count(chatMarket(state))} Nutzer`)}
+          ${kv('Marktanteil', F.pct(llmShare(state, cm.score), 1))} ${kv('Markt gesamt', F.count(chatMarket(state)))}
+          ${kv('Conversion', F.pct(conversion(state.chat.price), 1))}
           ${kv('Einnahmen', `${F.money(rev.chat)}/Wo`, 'good')}
-          <div class="btns">${btn('Chat abschalten', 'stopChat', {}, { cls: 'ghost small' })}</div>` : ''}`
-      : '<div class="sub">Erforsche „Instruction Tuning“, damit dein LLM chatten kann.</div>'}
+          ${loadBlock(state, 'chat')}
+          <div class="btns">${btn('Chat abschalten', 'stopProduct', { kind: 'chat' }, { cls: 'ghost small' })}</div>` : ''}`
+      : note('Dein LLM muss erst chatfähig werden: erforsche „Instruction Tuning“ und mach ein SFT-Post-Training.')}
     </div>
-
     ${h2('API')}
     <div class="card ${am ? 'hl' : ''}">
       ${modelLine(am, 'api')}
-      <div class="label">Preis pro 1M Tokens · Marktpreis ~${F.num(apiRefPrice(state), 2)} $</div>
+      <div class="label">Preis pro 1M Tokens · Markt ~${F.num(apiRefPrice(state), 2)} $</div>
       ${priceSeg(API.prices, state.api.price, 'apiPrice', (p) => `${p} $`)}
-      ${am ? `${kv('Tokens pro Woche', F.count(state.api.tokens))}
-        ${kv('Ziel', F.count(apiTarget(state)))}
+      ${am ? `${kv('Tokens pro Woche', F.count(state.api.tokens))}${kv('Ziel', F.count(apiTarget(state)))}
         ${kv('Einnahmen', `${F.money(rev.api)}/Wo`, 'good')}
-        <div class="btns">${btn('API abschalten', 'stopApi', {}, { cls: 'ghost small' })}</div>` : ''}
-    </div>
-
-    ${h2('Open Source')}
-    <div class="sub" style="margin:0 4px 10px">Bringt Ruf statt Geld. Ruf erhöht Nutzerwachstum und Auftragswerte.</div>
-    ${llms.map((m) => {
-      const done = state.openSourced.includes(m.id);
-      return `<div class="card"><div class="row"><div class="grow"><div class="title">${F.esc(m.name)}</div>
-        <div class="sub">Score ${Math.round(m.score)} · +${F.num(m.score * OPEN_SOURCE.repPerScore, 1)} Ruf</div></div>
-        ${done ? chip('Open Source', 'green') : btn('Veröffentlichen', 'openSource', { id: m.id }, { cls: 'ghost small' })}</div></div>`;
-    }).join('')}
-  `;
+        ${loadBlock(state, 'api')}
+        <div class="btns">${btn('API abschalten', 'stopProduct', { kind: 'api' }, { cls: 'ghost small' })}</div>` : ''}
+    </div>`;
+  return `${llmPart}
+    ${h2('Apps (kleine Modelle)')}${appRows.length ? list(appRows) : empty('Keine App live. Im Modell-Detail „Als App starten“.')}`;
 }
 
-export function pickModelSheet(state, kind) {
-  const llms = llmModels(state).sort((a, b) => b.score - a.score);
+export function pickModelSheet(state, ui, sh) {
+  const kind = sh.pick;
+  const llms = llmModels(state).filter((m) => kind !== 'chat' || m.chat).sort((a, b) => b.score - a.score);
   const cur = kind === 'chat' ? state.chat.modelId : state.api.modelId;
   return `<h3>Modell für ${kind === 'chat' ? 'Chat-Website' : 'API'}</h3>
-    ${llms.map((m) => `<button class="opt ${m.id === cur ? 'on' : ''}" data-act="setModel" data-kind="${kind}" data-id="${m.id}">
-      <span class="check">${m.id === cur ? '✓' : ''}</span><span class="grow"><b>${F.esc(m.name)}</b><br>
-      <span class="sub">Score ${Math.round(m.score)} · ${F.params(m.params)}${m.arch === 'moe' ? ' · MoE' : ''}${m.bits ? ` · ${m.bits} Bit` : ''}</span></span></button>`).join('')}
-    <div class="sub">Tipp: Quantisierte und MoE-Modelle brauchen weniger Inferenz-Compute.</div>
+    ${llms.map((m) => `<button class="opt ${m.id === cur ? 'on' : ''}" data-act="useModel" data-kind="${kind}" data-id="${m.id}">
+      <span class="check">${m.id === cur ? '✓' : ''}</span><span class="grow"><b>${F.esc(m.name)}</b> ${stageBadges(m)}<br>
+      <span class="sub">Score ${m.evaluated ? '' : '~'}${Math.round(shownScore(m))} · ${F.short(m.params)} · braucht ${F.gb(minServeGb(state, m))} VRAM</span></span></button>`).join('') || empty(kind === 'chat' ? 'Kein chatfähiges Modell (SFT nötig).' : 'Kein LLM.')}
+    ${note('Quantisierte und MoE-Modelle brauchen weniger VRAM und liefern mehr Tokens pro GPU.')}
     <div class="btns">${btn('Schließen', 'closeSheet', {}, { cls: 'ghost' })}</div>`;
 }

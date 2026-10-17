@@ -1,28 +1,43 @@
 import { ECONOMY } from '../../config/formulas.js';
 import { tickResearch } from './research.js';
-import { tickTraining } from './training.js';
+import { tickJob, tickQuick } from './training.js';
 import { tickContracts, weeklyIncome } from './market.js';
 import { weeklyCosts } from './company.js';
 import { tickRivals } from './rivals.js';
 import { tickProducts } from './products.js';
+import { tickEvents } from './events.js';
+import { checkGoals } from './goals.js';
+import { canRaise } from './funding.js';
+import { money } from '../util/format.js';
 
 // Eine Woche simulieren. Gibt die Ereignisse der Woche zurück.
 export function advanceWeek(state) {
-  if (state.gameOver) return [];
+  if (state.gameOver || state.pending.length) return [];
   const events = [];
 
-  tickResearch(state, events);
-  if (state.training) tickTraining(state, events);
+  tickResearch(state, events, state.research.bonus || 0);
+  state.research.bonus = 0;
+  tickJob(state, events);
+  tickQuick(state, events);
 
   const income = weeklyIncome(state);
-  const costs = weeklyCosts(state).total;
-  state.money += income - costs;
+  const costs = weeklyCosts(state);
+  state.money += income - costs.total;
 
   tickProducts(state, events);
 
   state.week++;
   tickRivals(state, events);
   tickContracts(state);
+  tickEvents(state, events);
+
+  const couldRaise = state.fundingReady;
+  state.fundingReady = canRaise(state);
+  if (state.fundingReady && !couldRaise) events.push({ type: 'funding', text: 'Investoren klopfen an! Business → Firma.', important: true });
+
+  for (const g of checkGoals(state)) {
+    events.push({ type: 'goal', text: `Ziel erreicht: ${g.text}${g.reward ? ` (+${money(g.reward)})` : ''}`, important: true });
+  }
 
   if (state.money < 0) {
     state.negWeeks++;
@@ -38,21 +53,17 @@ export function advanceWeek(state) {
   }
 
   state.lastWeek = { income, costs, events };
-  state.log = [...events.map((e) => ({ ...e, week: state.week })), ...state.log].slice(0, 80);
+  state.log = [...events.map((e) => ({ ...e, week: state.week })), ...state.log].slice(0, 120);
   return events;
 }
 
 // Vorspulen bis etwas Wichtiges passiert (max. maxWeeks)
 export function skip(state, maxWeeks = 26) {
   const all = [];
-  let income = 0, costs = 0;
-  for (let i = 0; i < maxWeeks && !state.gameOver; i++) {
+  for (let i = 0; i < maxWeeks && !state.gameOver && !state.pending.length; i++) {
     const ev = advanceWeek(state);
-    income += state.lastWeek.income;
-    costs += state.lastWeek.costs;
     all.push(...ev);
     if (ev.some((e) => e.important)) break;
   }
-  state.lastWeek = { income, costs, events: all };
   return all;
 }

@@ -1,8 +1,9 @@
 import { START } from '../config/formulas.js';
-import { INFERENCE } from '../config/products.js';
+import { DEFAULTS } from '../config/parts.js';
 
-export const SAVE_KEY = 'aicg-save';
-export const SAVE_VERSION = 2;
+export const SAVE_KEY = 'aicg-save-v3';
+export const OLD_SAVE_KEY = 'aicg-save';
+export const SAVE_VERSION = 3;
 
 export function newGame(seed = Date.now()) {
   return {
@@ -12,34 +13,39 @@ export function newGame(seed = Date.now()) {
     rng: seed | 0,
     rep: 0,
     location: START.location,
-    hardware: { ...START.hardware },
-    cloudGpus: 0,
-    staff: { engineer: 0, researcher: 0 },
-    research: { done: ['logreg'], current: null, progress: 0 },
+    machines: [{ id: 1, name: 'Laptop', chassis: 'laptop', ...DEFAULTS.laptop, nic: 'gbe', gpus: [], count: 1, role: 'train' }],
+    cloud: [],                 // Cloud-Gruppen: { id, offer, n, role }
+    market: { consumer: 1, pro: 1, dc: 1, until: 0 },
+    phasesSeen: 0,
+    staff: { researcher: 0, ml: 0, infra: 0, data: 0, sales: 0 },
+    research: { done: ['logreg'], current: null, progress: 0, queue: [], bonus: 0 },
     datasets: [],
     models: [],
-    training: null,
+    job: null,                 // laufendes Training (Pretraining, Post-Training, Distillation)
+    quick: [],                 // Quantisierung & Evals
     contracts: [],
-    apps: {},             // task -> modelId (nur kleine Modelle, LLMs laufen über Produkte)
+    apps: {},                  // task -> modelId (nur kleine Modelle, LLMs laufen über Produkte)
     chat: { modelId: null, price: 20, free: 0, paid: 0 },
     api: { modelId: null, price: 20, tokens: 0 },
     openSourced: [],
-    inferenceShare: INFERENCE.defaultShare,
+    funding: { round: 0, equity: 1, raised: 0, history: [] },
+    fundingReady: false,
+    goal: 0,
+    pending: [],               // Ereignisse mit Entscheidung
+    stats: { delivered: 0, upgrades: 0 },
     overloadWarned: false,
     seenRivals: 0,
-    nextId: 1,
+    nextId: 2,
     negWeeks: 0,
     gameOver: false,
     log: [],
-    lastWeek: null,       // Zusammenfassung der letzten Runde
+    lastWeek: null,
   };
 }
 
 function migrate(s) {
   // Neue Felder kommen aus newGame(), alte Werte bleiben erhalten
-  const out = { ...newGame(), ...s, version: SAVE_VERSION };
-  if ((s.version || 1) < 2) delete out.apps.llm;   // v1: LLM-App → jetzt Chat/API-Produkte
-  return out;
+  return { ...newGame(), ...s, version: SAVE_VERSION };
 }
 
 export function load() {
@@ -50,6 +56,15 @@ export function load() {
   } catch {
     return null;
   }
+}
+
+// Gab es einen Spielstand der alten Version (vor dem Hardware-Umbau)?
+export function hasOldSave() {
+  try { return !!localStorage.getItem(OLD_SAVE_KEY); } catch { return false; }
+}
+
+export function dropOldSave() {
+  try { localStorage.removeItem(OLD_SAVE_KEY); } catch { /* egal */ }
 }
 
 export function save(state) {
@@ -69,6 +84,7 @@ export function importSave(text) {
   const json = t.startsWith('{') ? t : decodeURIComponent(escape(atob(t)));
   const s = JSON.parse(json);
   if (typeof s.week !== 'number' || typeof s.money !== 'number') throw new Error('Kein gültiger Spielstand');
+  if ((s.version || 1) < 3) throw new Error('Spielstand aus einer alten Version (vor dem Hardware-Umbau)');
   return migrate(s);
 }
 
