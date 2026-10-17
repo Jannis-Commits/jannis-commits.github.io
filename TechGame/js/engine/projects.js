@@ -278,3 +278,20 @@ export function updateForm(s, productId) {
 
 export const projectsUsingFeature = (s, id) => s.projects.filter((p) => p.features.includes(id));
 export { hasTech };
+
+export function retireProduct(s, id) {
+  const p = productById(s, id);
+  if (!p || p.owner !== 'player') return 'Nicht gefunden';
+  s.products = s.products.filter((x) => x !== p);
+  for (const m of s.staff) if (m.assign === `s:${id}`) m.assign = null;
+  s.campaigns = s.campaigns.filter((c) => !(c.kind === 'product' && c.targetId === id));
+  s.projects.filter((x) => x.baseProductId === id).forEach((x) => { x.baseProductId = null; x.version = 1; });
+  log(s, '🗑️', `${p.name} eingestellt`);
+  return null;
+}
+
+export function stepPrice(price, d) {
+  let p = d > 0 ? price * 1.1 : price / 1.1;
+  if (p < 0.49) p = 0.49;
+  return p >= 10 ? Math.round(p) : Math.round(p * 100) / 100;
+}
