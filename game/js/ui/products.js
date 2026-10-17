@@ -1,4 +1,5 @@
 import { CHAT, API } from '../../config/products.js';
+import { DOMAINS } from '../../config/pipeline.js';
 import { TASKS } from '../../config/tasks.js';
 import * as F from '../util/format.js';
 import { btn, kv, h2, chip, bar, empty, row, list, note } from './components.js';
@@ -9,7 +10,7 @@ import { minServeGb } from '../engine/memory.js';
 import { appIncome } from '../engine/market.js';
 import { hostingCost } from '../engine/company.js';
 import {
-  llmModels, chatModel, apiModel, chatTarget, apiTarget, conversion, productRevenue, load, capacity, demand, apiRefPrice, chatMarket,
+  llmModels, chatModel, apiModel, chatTarget, apiTarget, conversion, productRevenue, load, capacity, demand, apiRefPrice, chatMarket, domainMarkets, domainMarketSize,
 } from '../engine/products.js';
 import { stageBadges } from './lab.js';
 
@@ -69,7 +70,14 @@ export function productsView(state) {
         ${kv('Einnahmen', `${F.money(rev.api)}/Wo`, 'good')}
         ${loadBlock(state, 'api')}
         <div class="btns">${btn('API abschalten', 'stopProduct', { kind: 'api' }, { cls: 'ghost small' })}</div>` : ''}
-    </div>`;
+    </div>
+    ${h2('Fach-Märkte')}
+    ${note(`Firmen zahlen für Spezialisten – je Fachgebiet ${F.money(domainMarketSize(state))}/Wo Markt. Es zählt dein bestes Modell aus Chat/API. Mit Fach-Daten per SFT spezialisieren!`)}
+    ${list(domainMarkets(state).map((d) => row({
+      icon: DOMAINS[d.domain].icon, title: DOMAINS[d.domain].name,
+      sub: d.model ? `${F.esc(d.model.name)} · Fach-Score ${Math.round(d.score)} · Anteil ${F.pct(d.share, 1)}` : 'Kein Modell in Chat/API',
+      right: `<b class="${d.revenue > 0 ? 'good' : ''}">${F.money(d.revenue)}</b>`,
+    })))}`;
   return `${llmPart}
     ${h2('Apps (kleine Modelle)')}${appRows.length ? list(appRows) : empty('Keine App live. Im Modell-Detail „Als App starten“.')}`;
 }

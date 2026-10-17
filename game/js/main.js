@@ -1,9 +1,9 @@
-import { newGame, load, save, exportSave, importSave, clearSave, hasOldSave, dropOldSave } from './state.js';
+import { newGame, load, save, exportSave, importSave, clearSave, dropOldSave } from './state.js';
 import { PARAM_STEPS } from '../config/formulas.js';
 import * as F from './util/format.js';
 import { advanceWeek, skip } from './engine/turn.js';
 import {
-  buyMachine, setRole, duplicate, sellMachines, addGpu, fillGpus, removeGpu, swapPart, addPart, removePart, setCloud, rentCloud,
+  buyMachine, setRole, duplicate, sellMachines, addGpu, fillGpus, removeGpu, swapPart, addPart, removePart, setCloud, rentCloud, buyPreset, autoBalance,
 } from './engine/hardware.js';
 import { move, hire, fire } from './engine/company.js';
 import { startResearch, unqueue } from './engine/research.js';
@@ -20,22 +20,24 @@ import { btn } from './ui/components.js';
 import { homeView } from './ui/home.js';
 import { infraView, machineSheet, partSheet, gpuSlotSheet, gpuInstallSheet } from './ui/infra.js';
 import { labView, modelSheet, openWeightsSheet } from './ui/lab.js';
-import { wizardSheet, defaultForm, specFromForm, fitIdx } from './ui/wizard.js';
+import { wizardSheet, defaultForm, specFromForm, fitIdx, formFromSpec } from './ui/wizard.js';
 import { researchView } from './ui/research.js';
 import { businessView } from './ui/business.js';
 import { pickModelSheet } from './ui/products.js';
-import { eventSheet, settingsSheet, importSheet, exportSheet, confirmSheet, oldSaveSheet } from './ui/sheets.js';
+import { eventSheet, settingsSheet, importSheet, exportSheet, confirmSheet, newGameSheet } from './ui/sheets.js';
+import { recommendTraining, autoScale } from './engine/advisor.js';
 
 const loaded = load();
 let state = loaded || freshGame();
+const firstStart = !loaded;
 const ui = {
   tab: 'home', seg: { infra: 'machines', lab: 'jobs', biz: 'contracts' }, sheet: null, form: null,
-  open: {}, shopTab: 'machines', used: false, oldGpus: false, modelFilter: 'all', branch: 'all', rankKey: 'score', exportText: '',
+  open: {}, shopTab: 'presets', used: false, oldGpus: false, modelFilter: 'all', branch: 'all', rankKey: 'score', exportText: '',
 };
-if (!loaded && hasOldSave()) ui.sheet = { kind: 'oldSave' };
+if (firstStart) ui.sheet = { kind: 'newGame', first: 1 };
 
-function freshGame() {
-  const s = newGame();
+function freshGame(difficulty) {
+  const s = newGame(Date.now(), difficulty);
   tickContracts(s); tickContracts(s);
   return s;
 }
@@ -51,7 +53,7 @@ const TABS = [
 const SHEETS = {
   machine: machineSheet, part: partSheet, gpuSlot: gpuSlotSheet, gpuInstall: gpuInstallSheet,
   model: modelSheet, openWeights: openWeightsSheet, wizard: wizardSheet, pickModel: pickModelSheet,
-  event: eventSheet, settings: settingsSheet, import: importSheet, export: exportSheet, confirm: confirmSheet, oldSave: oldSaveSheet,
+  event: eventSheet, settings: settingsSheet, import: importSheet, export: exportSheet, confirm: confirmSheet, newGame: newGameSheet,
 };
 
 // ---------- Rendering ----------
@@ -162,16 +164,28 @@ const actions = {
 
   openSheet: (d) => sheet({ ...d }),
   closeSheet: () => { ui.sheet = null; },
-  bgClose: (_, ev) => { if (ev.target.classList.contains('sheet-bg') && ui.sheet?.kind !== 'oldSave') ui.sheet = null; },
+  bgClose: (_, ev) => { if (ev.target.classList.contains('sheet-bg') && !ui.sheet?.first) ui.sheet = null; },
   openMachine: ({ id }) => machineBack(num(id)),
   openMachineBack: ({ id }) => machineBack(num(id)),
   openModel: ({ id }) => sheet({ kind: 'model', id: num(id) }),
 
+  buyPreset: ({ c, g, n }) => {
+    const m = buyPreset(state, c, g, num(n || 1));
+    if (m) toast(`${num(n || 1) > 1 ? `${n}× ` : ''}${m.name} gekauft`, 'blue');
+  },
+  autoBalance: ({ id }) => { const why = autoBalance(state, num(id)); toast(why || 'Optimiert!', why ? 'red' : 'blue'); },
+  startRecommended: () => {
+    const r = recommendTraining(state);
+    const m = r && startJob(state, r.spec);
+    if (m) { ui.sheet = null; toast(`Training gestartet: ${m.name}`, 'blue'); }
+  },
+  applyRec: () => { const r = recommendTraining(state); if (r) { ui.form = formFromSpec(state, r.spec); sheet({ kind: 'wizard' }); } },
+  useBoth: ({ id }) => { setProductModel(state, 'chat', num(id)); setProductModel(state, 'api', num(id)); if (state.settings.autoScale) autoScale(state); toast('Chat & API live', 'blue'); },
   buyMachine: ({ id, n }) => {
     const m = buyMachine(state, id, num(n || 1));
     if (m) { toast(`${m.name} gekauft`, 'blue'); machineBack(m.id); }
   },
-  setRole: ({ m, id }) => setRole(state, String(m).startsWith('cloud:') ? m : num(m), id),
+  setRole: ({ m, id }) => { setRole(state, String(m).startsWith('cloud:') ? m : num(m), id); },
   duplicate: ({ m, n }) => duplicate(state, num(m), num(n)),
   sellMachine: ({ m, n }) => {
     sellMachines(state, num(m), num(n));
@@ -186,7 +200,7 @@ const actions = {
   cloud: ({ id, d }) => { const c = state.cloud.find((x) => x.id === num(id)); if (c) setCloud(state, c.id, c.n + num(d)); },
   rentCloud: ({ id }) => rentCloud(state, id, 1, 'train'),
   move: ({ id }) => move(state, id),
-  staff: ({ role, d }) => (num(d) > 0 ? hire(state, role, num(d)) : fire(state, role, -num(d))),
+  staff: ({ role, d }) => { if (num(d) > 0) { hire(state, role, num(d)); state.stats.hiredWeek = state.week; } else fire(state, role, -num(d)); },
 
   research: ({ id }) => startResearch(state, id),
   unqueue: ({ id }) => unqueue(state, id),
@@ -219,7 +233,7 @@ const actions = {
     const m = r && downloadOpen(state, r);
     if (m) toast(`${m.name} heruntergeladen`, 'blue');
   },
-  useModel: ({ kind, id }) => { setProductModel(state, kind, num(id)); if (ui.sheet?.kind === 'pickModel') ui.sheet = null; toast(`${findModel(state, num(id)).name} läuft jetzt im ${kind === 'chat' ? 'Chat' : 'API'}`, 'blue'); },
+  useModel: ({ kind, id }) => { setProductModel(state, kind, num(id)); if (state.settings.autoScale) autoScale(state); if (ui.sheet?.kind === 'pickModel') ui.sheet = null; toast(`${findModel(state, num(id)).name} läuft jetzt im ${kind === 'chat' ? 'Chat' : 'API'}`, 'blue'); },
   stopProduct: ({ kind }) => setProductModel(state, kind, null),
   chatPrice: ({ v }) => setChatPrice(state, num(v)),
   apiPrice: ({ v }) => setApiPrice(state, num(v)),
@@ -232,7 +246,7 @@ const actions = {
 
   deliver: ({ id }) => {
     const c = deliver(state, num(id));
-    if (c) toast(`Auftrag geliefert: +${F.money(c.reward)}`, 'green');
+    if (c) toast(`Auftrag geliefert: +${F.money(c.reward)}${c.sub ? ` · wird Stammkunde (${F.money(c.sub.weekly)}/Wo)` : ''}`, 'green');
   },
   buyDs: ({ id }) => buyDataset(state, id),
   raise: () => { const r = raise(state); if (r) toast(`${r.name}: +${F.money(r.money)}`, 'green'); },
@@ -257,7 +271,8 @@ const actions = {
   },
   confirm: ({ what }) => sheet({ kind: 'confirm', what }),
   reset: () => { clearSave(); state = freshGame(); ui.sheet = null; ui.tab = 'home'; },
-  dismissOld: () => { dropOldSave(); ui.sheet = null; },
+  newGame: ({ d }) => { clearSave(); dropOldSave(); state = freshGame(d); ui.sheet = null; ui.tab = 'home'; window.scrollTo(0, 0); },
+  toggleSetting: ({ k, id }) => { state.settings[k] = id === '1'; },
 };
 
 document.addEventListener('click', async (ev) => {

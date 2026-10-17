@@ -1,4 +1,4 @@
-import { CONTRACTS, APPS } from '../../config/contracts.js';
+import { CONTRACTS, APPS, SUBS } from '../../config/contracts.js';
 import { ECONOMY } from '../../config/formulas.js';
 import { TASKS, SKILLS } from '../../config/tasks.js';
 import { DATASETS } from '../../config/datasets.js';
@@ -76,6 +76,7 @@ export function generateContract(state, bonus = 1) {
 
 export function tickContracts(state) {
   state.contracts = state.contracts.filter((c) => c.expires > state.week);
+  state.subs = state.subs.filter((x) => x.until > state.week);
   if (state.contracts.length < maxContracts(state) && rand(state) < CONTRACTS.newChance) {
     state.contracts.push(generateContract(state));
   }
@@ -113,6 +114,11 @@ export function deliver(state, contractId) {
   state.rep = Math.min(100, state.rep + TASKS[c.task].rep);
   state.contracts = state.contracts.filter((x) => x !== c);
   state.stats.delivered++;
+  // Zufriedene Kunden kommen wieder: wöchentliches Abo
+  if (state.subs.length < SUBS.max && rand(state) < SUBS.chance) {
+    c.sub = { id: state.nextId++, client: c.client, task: c.task, weekly: Math.round(c.reward * SUBS.share), until: state.week + randInt(state, ...SUBS.weeks) };
+    state.subs.push(c.sub);
+  }
   return c;
 }
 
@@ -123,14 +129,18 @@ export function appIncome(state, model) {
   return t.appBase * Math.pow(model.score / 100, APPS.scoreExp) * (1 + state.rep / APPS.repFactor);
 }
 
-export function weeklyIncome(state) {
-  let total = productRevenue(state).total;
+export function incomeBreakdown(state) {
+  const p = productRevenue(state);
+  let apps = 0;
   for (const id of Object.values(state.apps)) {
     const m = state.models.find((x) => x.id === id);
-    if (m) total += appIncome(state, m);
+    if (m) apps += appIncome(state, m);
   }
-  return total;
+  const subs = state.subs.reduce((a, x) => a + x.weekly, 0);
+  return { apps, subs, chat: p.chat, api: p.api, domains: p.domains, total: apps + subs + p.total };
 }
+
+export const weeklyIncome = (state) => incomeBreakdown(state).total;
 
 export function deployApp(state, id) {
   const m = state.models.find((x) => x.id === id);

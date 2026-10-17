@@ -6,10 +6,10 @@ Rundenbasiertes AI-Firmen-Spiel, mobile-first, Vanilla JS ohne Build.
 - `js/engine/` – Spiellogik (ohne DOM)
 - `js/ui/` – Ansichten pro Tab + Bottom-Sheets
 - `js/state.js` – Spielstand, Save/Export/Import
-- `tools/sim.mjs` – Bot spielt einen Run durch (Balancing): `node tools/sim.mjs [wochen] [seed]`
+- `tools/sim.mjs` – „Faulpelz-Bot“ folgt nur den Berater-Tipps (Balancing): `node tools/sim.mjs [wochen] [seed] [easy|normal|hard]`
 
 ## Tabs
-- **Zentrale** – Kennzahlen, nächstes Ziel, To-do-Liste (was gerade Aufmerksamkeit braucht), laufende Jobs, Logbuch
+- **Zentrale** – Berater-Karte (ein empfohlener nächster Schritt mit Ein-Tap-Aktion), Kennzahlen, Einnahmen-Aufschlüsselung, Meilenstein, To-do-Liste (was gerade Aufmerksamkeit braucht), laufende Jobs, Logbuch
 - **Infra** – Maschinen & Pools, Shop (Maschinen, GPUs neu/gebraucht), Standort, Cloud
 - **Labor** – Training (Pretraining, Post-Training, Distillation als Wizard), Modelle, Daten
 - **Forschung** – nach Zweigen gefiltert, mit Warteschlange
@@ -23,3 +23,9 @@ Rundenbasiertes AI-Firmen-Spiel, mobile-first, Vanilla JS ohne Build.
   - Trainings-Pipeline: Pretraining → SFT (inkl. Fach-Daten) → RLHF/DPO → Reasoning-RL → Agentic-RL, Distillation, Quantisierung (RTN/GPTQ/AWQ/QAT bis 2 Bit), Benchmarks, Open-Weight-Modelle herunterladen
   - Lernrate, Checkpoints, Loss-Kurve, Abstürze und Loss-Spikes mit Entscheidung
   - Aufträge mit Anforderungen (Fachgebiet, Skill, „läuft auf Gerät X“), Finanzierungsrunden bis IPO, Ereignisse, GPU-Marktphasen, Ziele, Team mit 5 Rollen
+- **M4 (spielbar machen):**
+  - Schwierigkeitsstufen Leicht/Normal/Schwer (Startgeld, Trainings-Effizienz, Forschungstempo, Markt-Härte, Finanzierung) – `config/difficulty.js`
+  - Geld ohne Frontier-Modell: Fach-Märkte (Medizin/Recht/Software/Support), Budget-API, Stammkunden-Abos, lukrativere Apps
+  - Weniger Warten: schnellere Forschung, günstigere Grundlagen, effizienteres Training
+  - Weniger Klicks: Fertig-Systeme im Shop (auch ×10/×100), „Auto-Optimieren“ je Maschine, empfohlenes Training (Ein-Tap oder im Wizard anpassen), Automatik für Forschung, Benchmarks/8-Bit und Cloud-Skalierung (im Menü abschaltbar)
+  - Berater (`js/engine/advisor.js`) – auch Grundlage der Balancing-Sim

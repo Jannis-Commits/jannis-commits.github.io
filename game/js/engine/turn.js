@@ -9,6 +9,28 @@ import { tickEvents } from './events.js';
 import { checkGoals } from './goals.js';
 import { canRaise } from './funding.js';
 import { money } from '../util/format.js';
+import { recommendResearch, autoScale } from './advisor.js';
+import { startResearch } from './research.js';
+import { runEval, quantize, quantOptions } from './training.js';
+
+// Komfort-Automatik (abschaltbar im Menü)
+function automate(state) {
+  const st = state.settings || {};
+  if (st.autoResearch) {
+    for (let i = 0; i < 2 && (!state.research.current || state.research.queue.length < 1); i++) {
+      const id = recommendResearch(state);
+      if (!id) break;
+      startResearch(state, id);
+    }
+  }
+  if (st.autoQuant) {
+    for (const m of state.models.filter((x) => x.status === 'ready' && x.finished === state.week && x.task === 'llm')) {
+      if (!m.evaluated) runEval(state, m.id);
+      if ((m.bits || 16) === 16 && quantOptions(state, m).some((o) => o.bits === 8)) quantize(state, m.id, 8);
+    }
+  }
+  if (st.autoScale) autoScale(state);
+}
 
 // Eine Woche simulieren. Gibt die Ereignisse der Woche zurück.
 export function advanceWeek(state) {
@@ -19,6 +41,7 @@ export function advanceWeek(state) {
   state.research.bonus = 0;
   tickJob(state, events);
   tickQuick(state, events);
+  automate(state);
 
   const income = weeklyIncome(state);
   const costs = weeklyCosts(state);

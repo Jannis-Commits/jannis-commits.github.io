@@ -1,7 +1,7 @@
 import { LOCATIONS } from '../../config/locations.js';
 import { CHASSIS } from '../../config/parts.js';
 import { STAFF } from '../../config/staff.js';
-import { ECONOMY, START } from '../../config/formulas.js';
+import { ECONOMY } from '../../config/formulas.js';
 import { gameYear } from '../util/format.js';
 import { isDone } from './research.js';
 import { usage, powerDraw, cloudWeekly } from './hardware.js';
@@ -30,7 +30,7 @@ export function move(state, id) {
 
 // ---------- Team ----------
 
-export const salary = (state, role) => STAFF[role].salary * (1 + Math.max(0, gameYear(state.week) - START.year) * ECONOMY.salaryGrowth);
+export const salary = (state, role) => STAFF[role].salary * (1 + Math.max(0, gameYear(state.week) - ECONOMY.salaryFrom) * ECONOMY.salaryGrowth);
 
 export function canHire(state, role) {
   if (usage(state).staff >= location(state).staff) return 'Kein Platz im Büro';

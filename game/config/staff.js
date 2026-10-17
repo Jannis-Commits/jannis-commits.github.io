@@ -3,7 +3,7 @@
 export const STAFF = {
   researcher: {
     name: 'Researcher', icon: '🔬', salary: 1200,
-    desc: '+4 Forschungspunkte pro Woche',
+    desc: '+6 Forschungspunkte pro Woche (× Schwierigkeit)',
   },
   ml: {
     name: 'ML-Engineer', icon: '🧑‍💻', salary: 1000,

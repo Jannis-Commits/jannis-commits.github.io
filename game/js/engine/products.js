@@ -1,9 +1,12 @@
-import { CHAT, API, OPEN_SOURCE, INFERENCE, USEFULNESS } from '../../config/products.js';
+import { CHAT, API, OPEN_SOURCE, INFERENCE, USEFULNESS, DOMAIN_MARKET } from '../../config/products.js';
+import { DOMAINS } from '../../config/pipeline.js';
+import { LLM } from '../../config/formulas.js';
 import { COMPUTE } from '../../config/formulas.js';
 import { gameYear } from '../util/format.js';
 import { allMachines, machineStats } from './hardware.js';
 import { serveRate } from './memory.js';
-import { llmShare } from './rivals.js';
+import { llmShare, rivalTopScores } from './rivals.js';
+import { diff } from './difficulty.js';
 
 // ---------- Märkte ----------
 
@@ -76,12 +79,39 @@ export function load(state, kind) {
 
 const servedShare = (l) => Math.min(1, 1 / Math.max(l, 1e-9));
 
+// ---------- Fach-Märkte ----------
+
+export const domainMarketSize = (state) =>
+  DOMAIN_MARKET.max / (1 + Math.exp(-(gameYear(state.week) - DOMAIN_MARKET.mid) * DOMAIN_MARKET.k));
+
+const domainOf = (m, d) => Math.min(100, m.score * (m.domainF?.[d] ?? LLM.domainBase));
+
+export function domainShare(state, ds) {
+  const e = diff(state).marketExp;
+  const mine = Math.pow(ds, e);
+  const others = rivalTopScores(state).reduce((a, r) => a + Math.pow(r.score * DOMAIN_MARKET.rivalFactor, e), 0);
+  return mine + others > 0 ? mine / (mine + others) : 0;
+}
+
+// Pro Fachgebiet: bestes Modell aus Chat/API, Score, Anteil, Einnahmen
+export function domainMarkets(state) {
+  const ms = [chatModel(state), apiModel(state)].filter(Boolean);
+  const size = domainMarketSize(state);
+  return Object.keys(DOMAINS).map((d) => {
+    const m = ms.sort((a, b) => domainOf(b, d) - domainOf(a, d))[0];
+    if (!m) return { domain: d, model: null, score: 0, share: 0, revenue: 0, size };
+    const score = domainOf(m, d), share = domainShare(state, score);
+    return { domain: d, model: m, score, share, revenue: size * share, size };
+  });
+}
+
 // ---------- Einnahmen ----------
 
 export function productRevenue(state) {
   const chat = chatModel(state) ? (state.chat.paid * state.chat.price) / 4.33 * servedShare(load(state, 'chat')) : 0;
   const api = apiModel(state) ? (state.api.tokens / 1e6) * state.api.price * servedShare(load(state, 'api')) : 0;
-  return { chat, api, total: chat + api };
+  const domains = domainMarkets(state).reduce((a, x) => a + x.revenue, 0);
+  return { chat, api, domains, total: chat + api + domains };
 }
 
 export const totalUsers = (state) => (chatModel(state) ? state.chat.free + state.chat.paid : 0);

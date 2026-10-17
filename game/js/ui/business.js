@@ -7,7 +7,7 @@ import { candidate, checks, meets, weeklyIncome } from '../engine/market.js';
 import { leaderboard } from '../engine/rivals.js';
 import { weeklyCosts, salary, canHire, location } from '../engine/company.js';
 import { usage } from '../engine/hardware.js';
-import { nextRound, roundChecks, canRaise, valuation } from '../engine/funding.js';
+import { nextRound, roundChecks, canRaise, valuation, roundMoney } from '../engine/funding.js';
 import { productsView } from './products.js';
 
 function contractsView(state) {
@@ -21,8 +21,10 @@ function contractsView(state) {
       <div class="chips">${checks(state, c, m).map(check).join('')}</div>
       <div class="btns">${btn(ok ? `Liefern: ${F.esc(m.name)}` : m ? 'Kein Modell erfüllt alles' : 'Kein Modell', 'deliver', { id: c.id }, { disabled: !ok, cls: 'small' })}</div></div>`;
   }).join('');
-  return `${note('Neue Aufträge kommen jede Woche. Das Modell bleibt nach der Lieferung erhalten. Edge-Aufträge brauchen kleine oder quantisierte Modelle.')}
-    ${cards || empty('Gerade keine Aufträge. Nächste Woche kommen neue.')}`;
+  const subs = state.subs.map((x) => row({ icon: TASKS[x.task].icon, title: F.esc(x.client), sub: `noch ${x.until - state.week} Wo`, right: `<b class="good">${F.money(x.weekly)}/Wo</b>` }));
+  return `${note('Neue Aufträge kommen jede Woche. Das Modell bleibt nach der Lieferung erhalten. 40 % der Kunden werden danach Stammkunden und zahlen wöchentlich.')}
+    ${cards || empty('Gerade keine Aufträge. Nächste Woche kommen neue.')}
+    ${subs.length ? h2(`Stammkunden (${subs.length})`) + list(subs) : ''}`;
 }
 
 function rankingView(state, ui) {
@@ -53,7 +55,7 @@ function firmaView(state) {
   }).join('');
   const r = nextRound(state);
   const fund = r ? `<div class="card ${canRaise(state) ? 'hl' : ''}"><div class="row"><div class="ico">💰</div><div class="grow"><div class="title">${r.name}</div>
-      <div class="sub">${F.money(r.money)} für ${F.pct(r.equity)} · Bewertung ${F.money(valuation(r))}</div></div></div>
+      <div class="sub">${F.money(roundMoney(state, r))} für ${F.pct(r.equity)} · Bewertung ${F.money(valuation(state, r))}</div></div></div>
       <div class="chips">${roundChecks(state).map(check).join('')}</div>
       <div class="btns">${btn(canRaise(state) ? 'Annehmen' : 'Noch nicht', 'raise', {}, { disabled: !canRaise(state) })}</div></div>`
     : note('Alle Finanzierungsrunden abgeschlossen. Du bist börsennotiert!', 'blue');

@@ -1,6 +1,7 @@
 import { RESEARCH_TREE } from '../../config/research.js';
 import { RESEARCH } from '../../config/formulas.js';
 import { gameYear } from '../util/format.js';
+import { diff } from './difficulty.js';
 
 // Fasst die Effekte aller abgeschlossenen Forschungen zusammen (pro Woche gecacht).
 let cache = { key: '', fx: null };
@@ -37,7 +38,7 @@ export function isAvailable(state, id) {
 }
 
 export function pointsPerWeek(state) {
-  return RESEARCH.founderPoints + state.staff.researcher * RESEARCH.researcherPoints;
+  return Math.round((RESEARCH.founderPoints + state.staff.researcher * RESEARCH.researcherPoints) * diff(state).research);
 }
 
 // Erforschen: läuft schon etwas, kommt es in die Warteschlange.

@@ -30,6 +30,14 @@ export const CONTRACTS = {
   ],
 };
 
+// Stammkunden: gelieferte Aufträge werden mit dieser Chance zum wöchentlichen Abo
+export const SUBS = {
+  chance: 0.4,
+  share: 0.06,     // 6 % des Auftragswerts pro Woche
+  weeks: [16, 30],
+  max: 12,
+};
+
 // App-Einnahmen kleiner Modelle: appBase * (Score/100)^2 * (1 + Ruf/100). LLMs verdienen über Produkte.
 export const APPS = {
   scoreExp: 2,

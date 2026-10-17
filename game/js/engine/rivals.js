@@ -1,6 +1,7 @@
 import { RIVAL_RELEASES, COMPANIES, FUTURE } from '../../config/rivals.js';
 import { WEEKS_PER_YEAR, START } from '../../config/formulas.js';
 import { SKILLS } from '../../config/tasks.js';
+import { diff } from './difficulty.js';
 
 // Fiktive Releases einmal vorberechnen (deterministisch, nicht im Spielstand)
 function futureReleases() {
@@ -66,7 +67,7 @@ export function leaderboard(state, key = 'score') {
 export const SKILL_KEYS = Object.keys(SKILLS);
 
 // Marktanteil eines Scores gegen das beste Modell jeder Rivalen-Firma
-export function llmShare(state, score, exp = 3) {
+export function llmShare(state, score, exp = diff(state).marketExp) {
   const mine = Math.pow(score, exp);
   const others = rivalTopScores(state).reduce((a, r) => a + Math.pow(r.score, exp), 0);
   return mine + others > 0 ? mine / (mine + others) : 0;
