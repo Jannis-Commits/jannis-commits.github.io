@@ -1,13 +1,13 @@
 // Service Worker: Network-first (immer neueste Version, wenn online), Cache als Offline-Fallback.
-const CACHE = 'aicg-v1';
+const CACHE = 'aicg-v2';
 const FILES = [
   './', 'index.html', 'manifest.webmanifest', 'css/style.css',
   'js/main.js', 'js/state.js', 'js/util/format.js', 'js/util/rng.js',
   'js/engine/turn.js', 'js/engine/training.js', 'js/engine/market.js', 'js/engine/rivals.js',
-  'js/engine/research.js', 'js/engine/company.js',
-  'js/ui/components.js', 'js/ui/firma.js', 'js/ui/models.js', 'js/ui/research.js', 'js/ui/market.js', 'js/ui/more.js',
+  'js/engine/research.js', 'js/engine/company.js', 'js/engine/products.js',
+  'js/ui/components.js', 'js/ui/firma.js', 'js/ui/models.js', 'js/ui/research.js', 'js/ui/market.js', 'js/ui/more.js', 'js/ui/products.js',
   'config/formulas.js', 'config/tasks.js', 'config/datasets.js', 'config/hardware.js', 'config/locations.js',
-  'config/staff.js', 'config/research.js', 'config/rivals.js', 'config/contracts.js',
+  'config/staff.js', 'config/research.js', 'config/rivals.js', 'config/contracts.js', 'config/products.js',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];
 

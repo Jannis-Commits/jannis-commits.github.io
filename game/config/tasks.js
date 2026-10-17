@@ -30,8 +30,8 @@ export const TASKS = {
   llm: {
     name: 'Sprachmodell (LLM)', icon: '🧠', tag: 'text', research: 'transformer',
     minWeeks: 3,
-    contractBase: 50000, appBase: 40000, rep: 5,
-    contractScore: [5, 45], // LLM-Aufträge fordern niedrigere Scores (andere Skala)
+    contractBase: 50000, rep: 5,
+    contractScore: 'rival', // Lizenz-Deals: Spanne hängt vom besten Rivalen ab (contracts.js)
   },
 };
 

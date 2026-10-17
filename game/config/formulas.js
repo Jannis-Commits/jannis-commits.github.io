@@ -21,7 +21,8 @@ export const SCALING = {
   qualityExp: 2,          // D_eff = Tokens * Qualität^qualityExp
   epochGain: 0.6,         // jede weitere Epoche bringt 60 % neuer Daten (effektiv)
   maxEpochs: 4,
-  tokensPerParam: 20,     // darunter droht Overfitting (bezogen auf einzigartige Tokens)
+  tokensPerParam: 20,     // Chinchilla-Optimum (nur Hinweis im UI)
+  overfitRatio: 4,        // Overfitting, wenn Parameter · 4 · √Epochen > einzigartige Tokens
   overfitLoss: 0.5,       // Loss-Strafe * overfit^2
   noise: 0.03,            // ±3 % Zufall auf den Loss beim Trainingsende
 };
@@ -31,7 +32,8 @@ export const LLM = {
   capScale: 0.25,
   capExp: 2,
   skillFloor: 0.35,       // Fähigkeit = cap * clamp(floor + gain * sqrt(Anteil im Dataset))
-  skillGain: 1.3,
+  skillGain: 1.1,
+  // Post-Training (capBoost aus der Forschung) schrumpft den Abstand (L - E): excess * Π(1 - boost)
 };
 
 export const COMPUTE = {
@@ -63,7 +65,7 @@ export const RESEARCH = {
 };
 
 export const PARAM_STEPS = [
-  1e5, 3e5, 1e6, 3e6, 1e7, 3e7, 1e8, 3e8, 1e9, 3e9, 1e10, 3e10, 1e11, 3e11, 1e12,
+  1e5, 3e5, 1e6, 3e6, 1e7, 3e7, 1e8, 3e8, 1e9, 3e9, 1e10, 3e10, 1e11, 3e11, 1e12, 3e12, 1e13,
 ];
 
 export const QUANT = {

@@ -10,20 +10,24 @@ import {
 } from '../engine/company.js';
 import { weeklyIncome } from '../engine/market.js';
 import { pointsPerWeek } from '../engine/research.js';
+import { totalUsers, load, productsActive } from '../engine/products.js';
 
 export function firmaView(state) {
   const loc = location(state), u = usage(state), costs = weeklyCosts(state), income = weeklyIncome(state);
   const net = income - costs.total;
   const ct = cloudType(state);
 
-  const hw = Object.keys(HARDWARE).filter((id) => state.hardware[id] || hardwareAvailable(state, id)).map((id) => {
+  // Neueste Hardware zuerst
+  const hw = Object.keys(HARDWARE).reverse().filter((id) => state.hardware[id] || hardwareAvailable(state, id)).map((id) => {
     const h = HARDWARE[id], n = state.hardware[id] || 0, why = canBuyHardware(state, id);
     return `<div class="card">
       <div class="row"><div class="grow"><div class="title">${h.name}${n ? ` × ${n}` : ''}</div>
       <div class="sub">${h.tflops} TFLOP/s · ${h.power} kW · Platz ${h.space}</div><div class="sub">${h.desc}</div></div>
       <div class="right"><div class="title">${h.cost ? F.money(h.cost) : '–'}</div></div></div>
-      ${h.cost ? `<div class="btns">${btn(why || 'Kaufen', 'buyHw', { id }, { disabled: !!why })}
-      ${n ? btn(`Verkaufen (${F.money(h.cost * ECONOMY.sellRefund)})`, 'sellHw', { id }, { cls: 'ghost' }) : ''}</div>` : ''}
+      ${h.cost ? `<div class="btns">${btn(why || 'Kaufen', 'buyHw', { id, n: 1 }, { disabled: !!why, cls: 'small' })}
+        ${!why ? btn('+10', 'buyHw', { id, n: 10 }, { cls: 'ghost small' }) + btn('+100', 'buyHw', { id, n: 100 }, { cls: 'ghost small' }) : ''}</div>
+      ${n ? `<div class="btns">${btn(`Verkaufen (${F.money(h.cost * ECONOMY.sellRefund)})`, 'sellHw', { id, n: 1 }, { cls: 'ghost small' })}
+        ${n >= 10 ? btn('−10', 'sellHw', { id, n: 10 }, { cls: 'ghost small' }) : ''}</div>` : ''}` : ''}
     </div>`;
   }).join('');
 
@@ -39,7 +43,8 @@ export function firmaView(state) {
     const why = canHire(state, role);
     return `<div class="card"><div class="row"><div class="grow"><div class="title">${s.name}</div>
       <div class="sub">${F.money(s.salary)}/Wo · ${s.desc}</div>${why && !state.staff[role] ? `<div class="warn">${why}</div>` : ''}</div>
-      ${stepper(state.staff[role], 'staff', { role })}</div></div>`;
+      ${stepper(state.staff[role], 'staff', { role })}</div>
+      ${location(state).staff >= 15 ? `<div class="btns">${btn('+5', 'staff', { role, d: 5 }, { cls: 'ghost small' })}${btn('+25', 'staff', { role, d: 25 }, { cls: 'ghost small' })}${btn('−5', 'staff', { role, d: -5 }, { cls: 'ghost small' })}</div>` : ''}</div>`;
   }).join('');
 
   return `
@@ -54,6 +59,7 @@ export function firmaView(state) {
       ${kv('Netto pro Woche', F.money(net), net >= 0 ? 'good' : 'bad')}
       ${kv('Ruf', `${Math.round(state.rep)} / 100`)}
       ${kv('Compute-Auslastung', F.pct(utilization(state)))}
+      ${productsActive(state) ? kv('Chat-Nutzer', F.count(Math.round(totalUsers(state)))) + kv('Serverlast', F.pct(load(state)), load(state) > 1 ? 'bad' : '') : ''}
     </div>
 
     ${h2('Kosten pro Woche')}
@@ -78,7 +84,8 @@ export function firmaView(state) {
       <div class="sub">${ct.tflops} TFLOP/s · ${F.money(cloudWeeklyPrice(state))}/Wo pro GPU</div>
       <div class="sub">Kein Platz oder Strom nötig. Kosten laufen jede Woche.</div></div>
       ${stepper(state.cloudGpus, 'cloud', {})}</div>
-      <div class="btns">${btn('−10', 'cloud', { d: -10 }, { cls: 'ghost small' })}${btn('+10', 'cloud', { d: 10 }, { cls: 'ghost small' })}${btn('Alle weg', 'cloud', { d: -9999 }, { cls: 'ghost small' })}</div>
+      <div class="btns">${btn('+10', 'cloud', { d: 10 }, { cls: 'ghost small' })}${btn('+100', 'cloud', { d: 100 }, { cls: 'ghost small' })}${btn('+1000', 'cloud', { d: 1000 }, { cls: 'ghost small' })}</div>
+      <div class="btns">${btn('−10', 'cloud', { d: -10 }, { cls: 'ghost small' })}${btn('−100', 'cloud', { d: -100 }, { cls: 'ghost small' })}${btn('Alle weg', 'cloud', { d: -1e9 }, { cls: 'ghost small' })}</div>
     </div>
 
     ${h2('Team')}

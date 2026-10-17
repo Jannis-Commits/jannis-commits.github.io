@@ -6,7 +6,9 @@
 //   quality        + Dataset-Qualität (absolut)
 //   taskLoss       { task: −Loss } bessere Ergebnisse für einen Modell-Typ
 //   skills         { skill: +Multiplikator } für LLMs
-//   features       ['quantize', 'moe']
+//   features       ['quantize', 'moe', 'chat']
+//   (year)         frühestens ab diesem Jahr erforschbar
+//   capBoost       Post-Training: schrumpft den LLM-Abstand zum Optimum (0.1 = −10 %)
 
 export const RESEARCH_TREE = {
   logreg: {
@@ -96,7 +98,79 @@ export const RESEARCH_TREE = {
   },
   moe: {
     name: 'Mixture of Experts', cost: 400, req: ['scaling-laws'],
-    desc: 'MoE-Architektur: 4× weniger Compute pro Parameter.',
+    desc: 'MoE-Architektur: 4× weniger Compute pro Parameter. Bis 1 trillion Parameter.',
     effects: { maxParams: 1e12, features: ['moe'] },
+  },
+
+  // ---------- Late Game: Post-Training, Reasoning, Mega-Cluster ----------
+  'instruction-tuning': {
+    name: 'Instruction Tuning', year: 2021.8, cost: 250, req: ['transformer'],
+    desc: 'LLMs folgen Anweisungen. Schaltet die Chat-Website frei. +5 % LLM-Qualität.',
+    effects: { capBoost: 0.05, features: ['chat'] },
+  },
+  rlhf: {
+    name: 'RLHF', year: 2022.3, cost: 400, req: ['instruction-tuning'],
+    desc: 'Feedback von Menschen macht Antworten hilfreicher. +6 % LLM-Qualität.',
+    effects: { capBoost: 0.06 },
+  },
+  'flash-attention': {
+    name: 'FlashAttention', year: 2022.2, cost: 300, req: ['transformer', 'mixed-precision'],
+    desc: '+10 % Compute-Auslastung, Gen-4-GPUs.',
+    effects: { util: 0.1 },
+  },
+  'mega-cluster': {
+    name: 'Mega-Cluster', year: 2022.5, cost: 500, req: ['distributed', 'scaling-laws'],
+    desc: 'Eigener Server-Standort mit tausenden GPUs, Gen-5-GPUs.',
+    effects: { failRed: 0.02 },
+  },
+  'long-context': {
+    name: 'Long Context', year: 2023.2, cost: 500, req: ['flash-attention'],
+    desc: '+5 % Coding & Language.',
+    effects: { skills: { coding: 0.05, language: 0.05 } },
+  },
+  cot: {
+    name: 'Chain-of-Thought', year: 2022.8, cost: 600, req: ['rlhf'],
+    desc: 'Schritt für Schritt denken. +5 % LLM-Qualität, +8 % Math & Reasoning.',
+    effects: { capBoost: 0.05, skills: { math: 0.08, reasoning: 0.08 } },
+  },
+  'synthetic-data': {
+    name: 'Synthetic Data', year: 2023.8, cost: 600, req: ['scaling-laws', 'rlhf'],
+    desc: 'Eigene Modelle erzeugen Trainingsdaten. Neue Datasets.',
+    effects: {},
+  },
+  multimodal: {
+    name: 'Multimodal (Bild, Audio, Video)', year: 2023.5, cost: 700, req: ['transformer', 'cnn', 'rlhf'],
+    desc: 'Modelle sehen und hören. +5 % Language & Reasoning.',
+    effects: { skills: { language: 0.05, reasoning: 0.05 } },
+  },
+  'tool-use': {
+    name: 'Tool Use', year: 2023.4, cost: 800, req: ['cot'],
+    desc: 'Modelle nutzen Rechner, Suche und Code. +3 % Qualität, +8 % Coding & Math.',
+    effects: { capBoost: 0.03, skills: { coding: 0.08, math: 0.08 } },
+  },
+  hyperscale: {
+    name: 'Hyperscale-Infrastruktur', year: 2024, cost: 1000, req: ['mega-cluster'],
+    desc: 'Schaltet den Hyperscale-Campus frei (100 MW).',
+    effects: {},
+  },
+  reasoning: {
+    name: 'Reasoning (Test-Time Compute)', year: 2024.3, cost: 1200, req: ['cot', 'synthetic-data'],
+    desc: 'Modelle denken vor der Antwort lange nach. +8 % Qualität, +10 % Math & Reasoning.',
+    effects: { capBoost: 0.08, skills: { math: 0.1, reasoning: 0.1 } },
+  },
+  agents: {
+    name: 'Agents', year: 2025, cost: 1500, req: ['tool-use', 'reasoning'],
+    desc: 'Modelle erledigen lange Aufgaben selbstständig. +5 % Qualität, +8 % Coding.',
+    effects: { capBoost: 0.05, skills: { coding: 0.08, reasoning: 0.05 } },
+  },
+  'next-gen-arch': {
+    name: 'Next-Gen Architekturen', year: 2026.3, cost: 2000, req: ['moe', 'reasoning'],
+    desc: 'Bis 10 trillion Parameter, Gen-6-GPUs, +4 % Qualität.',
+    effects: { maxParams: 1e13, capBoost: 0.04 },
+  },
+  gigawatt: {
+    name: 'Gigawatt-Rechenzentren', year: 2026, cost: 2500, req: ['hyperscale'],
+    desc: 'Schaltet den Gigawatt-Campus frei (1 GW).',
+    effects: {},
   },
 };

@@ -4,13 +4,14 @@ import * as F from '../util/format.js';
 import { btn, h2, chip, seg, empty } from './components.js';
 import { bestModelFor, datasetAvailable } from '../engine/market.js';
 import { leaderboard } from '../engine/rivals.js';
+import { productsView } from './products.js';
 
 function contractsView(state) {
   const cards = state.contracts.map((c) => {
     const t = TASKS[c.task], m = bestModelFor(state, c.task), ok = m && m.score >= c.minScore;
     const left = c.expires - state.week;
     return `<div class="card"><div class="row"><div class="ico">${t.icon}</div><div class="grow">
-      <div class="title">${t.name}</div><div class="sub">${F.esc(c.client)}</div></div>
+      <div class="title">${c.task === 'llm' ? 'Lizenz-Deal (LLM)' : t.name}</div><div class="sub">${F.esc(c.client)}</div></div>
       <div class="right"><div class="title good">${F.money(c.reward)}</div></div></div>
       <div class="chips">${chip(`Mindest-Score ${c.minScore}`, 'blue')}${chip(`noch ${left} Wo`, left <= 1 ? 'red' : '')}
         ${m ? chip(`Dein bestes: ${Math.round(m.score)}`, ok ? 'green' : 'amber') : chip('Kein Modell', 'amber')}</div>
@@ -39,7 +40,8 @@ function datasetsView(state) {
 function rankingView(state, ui) {
   const key = ui.rankKey || 'score';
   const rows = leaderboard(state, key);
-  const opts = [['score', 'Gesamt'], ...Object.entries(SKILLS).map(([k, v]) => [k, v])];
+  const short = { language: 'Lang.', coding: 'Code', math: 'Math', reasoning: 'Reas.' };
+  const opts = [['score', 'Gesamt'], ...Object.keys(SKILLS).map((k) => [k, short[k]])];
   return `${seg(opts, key, 'rankKey')}
     ${rows.length ? `<div class="card" style="padding:4px 10px"><table class="lb">${rows.slice(0, 30).map((r, i) => `
       <tr class="${r.mine ? 'mine' : ''}"><td class="pos">${i + 1}</td>
@@ -51,6 +53,7 @@ function rankingView(state, ui) {
 
 export function marketView(state, ui) {
   const s = ui.marketSeg || 'contracts';
-  const body = s === 'contracts' ? contractsView(state) : s === 'datasets' ? datasetsView(state) : rankingView(state, ui);
-  return `${seg([['contracts', `Aufträge (${state.contracts.length})`], ['datasets', 'Datasets'], ['ranking', 'Rangliste']], s, 'marketSeg')}${body}`;
+  const views = { contracts: contractsView, products: productsView, datasets: datasetsView, ranking: rankingView };
+  const tabs = [['contracts', `Aufträge`], ['products', 'Produkte'], ['datasets', 'Daten'], ['ranking', 'Ranking']];
+  return `${seg(tabs, s, 'marketSeg')}${views[s](state, ui)}`;
 }

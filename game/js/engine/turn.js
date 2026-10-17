@@ -4,6 +4,7 @@ import { tickTraining } from './training.js';
 import { tickContracts, weeklyIncome } from './market.js';
 import { weeklyCosts } from './company.js';
 import { tickRivals } from './rivals.js';
+import { tickProducts } from './products.js';
 
 // Eine Woche simulieren. Gibt die Ereignisse der Woche zurück.
 export function advanceWeek(state) {
@@ -16,6 +17,8 @@ export function advanceWeek(state) {
   const income = weeklyIncome(state);
   const costs = weeklyCosts(state).total;
   state.money += income - costs;
+
+  tickProducts(state, events);
 
   state.week++;
   tickRivals(state, events);

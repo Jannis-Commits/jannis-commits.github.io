@@ -6,14 +6,22 @@ import { rand, randInt, pick } from '../util/rng.js';
 import { gameYear } from '../util/format.js';
 import { isDone } from './research.js';
 import { taskUnlocked } from './training.js';
-import { rivalTopScores } from './rivals.js';
+import { bestRivalScore } from './rivals.js';
+import { productRevenue } from './products.js';
 
 const eraMult = (state) => 1 + state.week / ECONOMY.eraGrowth;
+
+// LLM-Aufträge (Lizenz-Deals) wachsen mit dem Stand der Rivalen mit
+function scoreRange(state, task) {
+  if (TASKS[task].contractScore !== 'rival') return CONTRACTS.minScore;
+  const best = Math.max(CONTRACTS.llmMinBest, bestRivalScore(state));
+  return CONTRACTS.llmRange.map((f) => Math.max(3, Math.round(best * f)));
+}
 
 export function generateContract(state) {
   const tasks = Object.keys(TASKS).filter((t) => taskUnlocked(state, t));
   const task = pick(state, tasks);
-  const range = TASKS[task].contractScore || CONTRACTS.minScore;
+  const range = scoreRange(state, task);
   const minScore = randInt(state, ...range);
   const reward = Math.round(
     TASKS[task].contractBase * Math.pow((minScore - range[0]) / (range[1] - range[0]) + 0.6, CONTRACTS.difficultyExp)
@@ -53,24 +61,13 @@ export function deliver(state, contractId) {
   return c;
 }
 
-// Marktanteil eines LLM gegen die stärksten Rivalen
-export function llmShare(state, score) {
-  const rivals = rivalTopScores(state);
-  const e = APPS.llmShareExp;
-  const mine = Math.pow(score, e);
-  const others = rivals.reduce((a, r) => a + Math.pow(r.score, e), 0);
-  return mine + others > 0 ? mine / (mine + others) : 0;
-}
-
 export function appIncome(state, model) {
   const t = TASKS[model.task];
-  let v = t.appBase * Math.pow(model.score / 100, APPS.scoreExp) * (1 + state.rep / APPS.repFactor);
-  if (model.task === 'llm') v *= llmShare(state, model.score);
-  return v;
+  return t.appBase * Math.pow(model.score / 100, APPS.scoreExp) * (1 + state.rep / APPS.repFactor);
 }
 
 export function weeklyIncome(state) {
-  let total = 0;
+  let total = productRevenue(state).total;
   for (const id of Object.values(state.apps)) {
     const m = state.models.find((x) => x.id === id);
     if (m) total += appIncome(state, m);
@@ -80,7 +77,7 @@ export function weeklyIncome(state) {
 
 export function deployApp(state, id) {
   const m = state.models.find((x) => x.id === id);
-  if (m && m.status === 'ready') state.apps[m.task] = m.id;
+  if (m && m.status === 'ready' && m.task !== 'llm') state.apps[m.task] = m.id;
 }
 
 export function stopApp(state, task) {

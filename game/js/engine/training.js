@@ -2,7 +2,7 @@ import { SCALING, LLM, TRAINING, MOE, QUANT } from '../../config/formulas.js';
 import { TASKS, SKILLS } from '../../config/tasks.js';
 import { DATASETS } from '../../config/datasets.js';
 import { effects, isDone } from './research.js';
-import { weeklyCompute } from './company.js';
+import { trainingCompute, releaseModel } from './products.js';
 import { rand } from '../util/rng.js';
 
 export const taskUnlocked = (state, task) => isDone(state, TASKS[task].research);
@@ -14,17 +14,19 @@ export function datasetsFor(state, task) {
 // Mehrere Datasets zusammenwerfen: Tokens addieren, Qualität und Mix gewichten.
 export function combine(state, ids) {
   const bonus = effects(state).quality;
-  let tokens = 0, q = 0;
+  let tokens = 0, q = 0, mixWeight = 0;
   const mix = Object.fromEntries(Object.keys(SKILLS).map((k) => [k, 0]));
   for (const id of ids) {
     const d = DATASETS[id];
     tokens += d.tokens;
     q += d.quality * d.tokens;
     const m = d.mix || { language: 1 };
-    for (const k of Object.keys(mix)) mix[k] += (m[k] || 0) * d.tokens;
+    const w = d.tokens * (d.upsample || 1);   // kleine, wertvolle Datasets zählen im Mix stärker
+    mixWeight += w;
+    for (const k of Object.keys(mix)) mix[k] += (m[k] || 0) * w;
   }
   if (!tokens) return { tokens: 0, quality: 0, mix };
-  for (const k of Object.keys(mix)) mix[k] /= tokens;
+  for (const k of Object.keys(mix)) mix[k] /= mixWeight;
   return { tokens, quality: Math.min(1, q / tokens + bonus), mix };
 }
 
@@ -37,11 +39,11 @@ export function analyze(state, spec) {
   const nEff = spec.arch === 'moe' ? Math.pow(spec.params, MOE.qualityExp) : spec.params;
   const dSeen = c.tokens * spec.epochs;
   const dEff = c.tokens * (1 + S.epochGain * (spec.epochs - 1)) * Math.pow(c.quality, S.qualityExp);
-  const overfit = c.tokens ? Math.max(0, Math.log10((S.tokensPerParam * spec.params) / c.tokens)) : 0;
+  const overfit = c.tokens ? Math.max(0, Math.log10((S.overfitRatio * Math.sqrt(spec.epochs) * spec.params) / c.tokens)) : 0;
   const loss = S.E + S.A / Math.pow(nEff, S.alpha) + S.B / Math.pow(Math.max(dEff, 1), S.beta)
     + S.overfitLoss * overfit * overfit - (e.taskLoss[spec.task] || 0);
   const flopsNeeded = 6 * activeParams(spec) * dSeen;
-  const perWeek = weeklyCompute(state);
+  const perWeek = trainingCompute(state);
   const weeks = Math.max(TASKS[spec.task].minWeeks, Math.ceil(flopsNeeded / perWeek));
   const fail = Math.max(TRAINING.minFail, TRAINING.baseFail - state.staff.engineer * TRAINING.failPerEngineer - e.failRed)
     + overfit * TRAINING.overfitFail;
@@ -52,8 +54,9 @@ export function analyze(state, spec) {
 export function evaluate(state, task, loss, mix) {
   const t = TASKS[task];
   if (task !== 'llm') return { score: 100 / (1 + Math.exp((loss - t.l50) * t.slope)) };
-  const cap = 100 / (1 + Math.pow(Math.max(loss - SCALING.E, 0.001) / LLM.capScale, LLM.capExp));
   const e = effects(state);
+  const excess = Math.max(loss - SCALING.E, 0.001) * e.capMult;
+  const cap = 100 / (1 + Math.pow(excess / LLM.capScale, LLM.capExp));
   const skills = {};
   for (const k of Object.keys(SKILLS)) {
     const f = Math.min(1, LLM.skillFloor + LLM.skillGain * Math.sqrt(mix[k] || 0));
@@ -69,7 +72,7 @@ export function validate(state, spec) {
   if (!spec.datasets.length) return 'Wähle mindestens ein Dataset';
   if (spec.params > effects(state).maxParams) return 'Zu viele Parameter für deinen Forschungsstand';
   if (spec.arch === 'moe' && !effects(state).features.has('moe')) return 'MoE nicht erforscht';
-  if (weeklyCompute(state) <= 0) return 'Kein Compute';
+  if (trainingCompute(state) <= 0) return 'Kein Compute fürs Training (Inferenz-Anteil prüfen)';
   return null;
 }
 
@@ -106,7 +109,7 @@ export function abortTraining(state) {
 export function tickTraining(state, events) {
   const m = state.models.find((x) => x.id === state.training);
   if (!m) { state.training = null; return; }
-  m.flopsDone += weeklyCompute(state);
+  m.flopsDone += trainingCompute(state);
   m.weeksDone++;
   const pWeek = 1 - Math.pow(1 - m.fail, 1 / Math.max(1, m.estWeeks));
   if (rand(state) < pWeek) {
@@ -147,4 +150,5 @@ export function deleteModel(state, id) {
   if (state.training === id) return;
   state.models = state.models.filter((m) => m.id !== id);
   for (const [t, mid] of Object.entries(state.apps)) if (mid === id) delete state.apps[t];
+  releaseModel(state, id);
 }

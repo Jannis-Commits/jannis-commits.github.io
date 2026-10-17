@@ -7,6 +7,8 @@ import { startTraining, abortTraining, quantize, deleteModel, datasetsFor } from
 import { buyHardware, sellHardware, move, setCloud, hire, fire, weeklyCosts } from './engine/company.js';
 import { startResearch } from './engine/research.js';
 import { deliver, deployApp, stopApp, buyDataset, weeklyIncome, tickContracts } from './engine/market.js';
+import { setChatModel, setApiModel, setChatPrice, setApiPrice, setInferenceShare, openSource } from './engine/products.js';
+import { pickModelSheet } from './ui/products.js';
 import { firmaView } from './ui/firma.js';
 import { modelsView, trainSheet, defaultForm, maxParamIdx } from './ui/models.js';
 import { researchView } from './ui/research.js';
@@ -65,6 +67,7 @@ function renderSheet() {
     : ui.sheet === 'import' ? importSheet()
     : ui.sheet === 'export' ? exportSheet(ui.exportText)
     : ui.sheet === 'reset' ? confirmSheet('Dein aktueller Spielstand wird gelöscht.', 'reset')
+    : ui.sheet === 'pickModel' ? pickModelSheet(state, ui.pickKind)
     : '';
   el.innerHTML = `<div class="sheet-bg" data-act="bgClose"><div class="sheet${anim}" data-kind="${ui.sheet}"><div class="grab"></div>${content}</div></div>`;
   el.querySelector('.sheet').scrollTop = scroll;
@@ -107,11 +110,14 @@ const actions = {
     showEvents(ev);
   },
 
-  buyHw: ({ id }) => buyHardware(state, id),
-  sellHw: ({ id }) => sellHardware(state, id),
+  buyHw: ({ id, n }) => {
+    const k = buyHardware(state, id, num(n || 1));
+    if (k > 1) toast(`${k}× gekauft`, 'blue');
+  },
+  sellHw: ({ id, n }) => sellHardware(state, id, num(n || 1)),
   move: ({ id }) => move(state, id),
   cloud: ({ d }) => setCloud(state, state.cloudGpus + num(d)),
-  staff: ({ role, d }) => (num(d) > 0 ? hire(state, role) : fire(state, role)),
+  staff: ({ role, d }) => (num(d) > 0 ? hire(state, role, num(d)) : fire(state, role, -num(d))),
 
   research: ({ id }) => startResearch(state, id),
 
@@ -141,6 +147,22 @@ const actions = {
   deleteModel: ({ id }) => deleteModel(state, num(id)),
   deployApp: ({ id }) => deployApp(state, num(id)),
   stopApp: ({ task }) => stopApp(state, task),
+  goProducts: () => { ui.tab = 'market'; ui.marketSeg = 'products'; window.scrollTo(0, 0); },
+
+  pickModel: ({ kind }) => { ui.pickKind = kind; ui.sheet = 'pickModel'; },
+  setModel: ({ kind, id }) => {
+    (kind === 'chat' ? setChatModel : setApiModel)(state, num(id));
+    ui.sheet = null;
+  },
+  stopChat: () => setChatModel(state, null),
+  stopApi: () => setApiModel(state, null),
+  chatPrice: ({ v }) => setChatPrice(state, num(v)),
+  apiPrice: ({ v }) => setApiPrice(state, num(v)),
+  infShare: ({ v }) => setInferenceShare(state, num(v)),
+  openSource: ({ id }) => {
+    const gain = openSource(state, num(id));
+    if (gain) toast(`Open Source veröffentlicht: +${F.num(gain, 1)} Ruf`, 'blue');
+  },
 
   marketSeg: ({ id }) => { ui.marketSeg = id; },
   rankKey: ({ id }) => { ui.rankKey = id; },

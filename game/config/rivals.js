@@ -20,8 +20,8 @@ export const RIVAL_RELEASES = [
   { company: 'openai', name: 'GPT-2', year: 2019.1, scores: s(14, 3, 2, 6) },
   { company: 'meta', name: 'RoBERTa', year: 2019.55, scores: s(10, 1, 1, 4) },
   { company: 'google', name: 'T5', year: 2019.8, scores: s(15, 3, 3, 8) },
-  { company: 'openai', name: 'GPT-3', year: 2020.4, scores: s(48, 25, 18, 32) },
-  { company: 'deepmind', name: 'Gopher', year: 2021.95, scores: s(50, 20, 20, 35) },
+  { company: 'openai', name: 'GPT-3', year: 2020.4, scores: s(28, 14, 9, 18) },
+  { company: 'deepmind', name: 'Gopher', year: 2021.95, scores: s(36, 16, 14, 26) },
   { company: 'google', name: 'PaLM', year: 2022.3, scores: s(58, 40, 30, 45) },
   { company: 'openai', name: 'ChatGPT', year: 2022.9, scores: s(62, 45, 30, 45) },
   { company: 'meta', name: 'Llama', year: 2023.15, scores: s(52, 30, 22, 38) },
@@ -41,3 +41,26 @@ export const RIVAL_RELEASES = [
   { company: 'anthropic', name: 'Claude 3.7 Sonnet', year: 2025.15, scores: s(86, 88, 82, 85) },
   { company: 'google', name: 'Gemini 2.5 Pro', year: 2025.23, scores: s(88, 86, 88, 88) },
 ];
+
+// Nach den echten Releases geht es fiktiv weiter: jede Firma bringt im Takt neue Modelle.
+// score(y) = ceiling − (ceiling − startScore) · exp(−(y − start) / tau) + offset
+export const FUTURE = {
+  start: 2025.5,
+  end: 2036,
+  ceiling: 98,
+  startScore: 88,
+  tau: 2.2,
+  series: {
+    openai: { prefix: 'GPT-', version: 5, step: 0.5, every: 0.5, phase: 0.1, offset: 0 },
+    anthropic: { prefix: 'Claude ', version: 4, step: 0.5, every: 0.5, phase: 0.0, offset: 0.5 },
+    google: { prefix: 'Gemini ', version: 3, step: 0.5, every: 0.5, phase: 0.35, offset: 0 },
+    xai: { prefix: 'Grok ', version: 4, step: 1, every: 0.75, phase: 0.2, offset: -1.5 },
+    deepseek: { prefix: 'DeepSeek-V', version: 4, step: 1, every: 0.75, phase: 0.45, offset: -2.5 },
+    meta: { prefix: 'Llama ', version: 4, step: 1, every: 1, phase: 0.3, offset: -5 },
+  },
+  // Stärken je Firma (wird auf den Gesamt-Score addiert)
+  bias: {
+    openai: s(0, 1, 1, 1), anthropic: s(1, 2, -1, 0), google: s(1, 0, 1, 0),
+    xai: s(-1, 0, 1, 1), deepseek: s(-2, 1, 2, 1), meta: s(0, -1, -1, -1),
+  },
+};

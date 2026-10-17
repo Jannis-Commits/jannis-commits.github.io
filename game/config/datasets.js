@@ -1,6 +1,7 @@
 // Datasets: einmal kaufen, für immer nutzen.
 // tokens = Trainingsbeispiele/Tokens, quality 0–1, mix = Anteile der Fähigkeiten (nur für LLMs).
 // year = ab wann verfügbar, research = benötigte Forschung.
+// upsample = zählt im Fähigkeiten-Mix so viel stärker (kleine, wertvolle Datasets).
 
 export const DATASETS = {
   'sms-spam': {
@@ -70,5 +71,30 @@ export const DATASETS = {
     name: 'Kuratierter Web-Crawl', cost: 150000, tokens: 1e12, quality: 0.75, tags: ['text'],
     mix: { language: 0.45, reasoning: 0.2, coding: 0.2, math: 0.15 },
     desc: 'Gefiltert und dedupliziert.', research: 'scaling-laws', year: 2020.5,
+  },
+  'code-instruct': {
+    name: 'Code-Instruct', cost: 400000, tokens: 2e11, quality: 0.9, tags: ['text'], upsample: 15,
+    mix: { coding: 0.8, reasoning: 0.15, language: 0.05 },
+    desc: 'Aufgaben mit geprüften Lösungen.', research: 'code-models', year: 2021.5,
+  },
+  'mega-mix': {
+    name: 'Mega-Mix (15 trillion Tokens)', cost: 5000000, tokens: 1.5e13, quality: 0.8, tags: ['text'],
+    mix: { language: 0.45, reasoning: 0.2, coding: 0.2, math: 0.15 },
+    desc: 'Das halbe Internet, sauber gefiltert.', research: 'mega-cluster', year: 2023,
+  },
+  'reasoning-traces': {
+    name: 'Reasoning-Traces', cost: 1000000, tokens: 1e11, quality: 0.95, tags: ['text'], upsample: 40,
+    mix: { math: 0.4, reasoning: 0.5, coding: 0.1 },
+    desc: 'Lange, geprüfte Lösungswege.', research: 'cot', year: 2024,
+  },
+  synthetic: {
+    name: 'Synthetische Daten (generiert)', cost: 20000000, tokens: 3e13, quality: 0.88, tags: ['text'], upsample: 2,
+    mix: { reasoning: 0.35, math: 0.25, coding: 0.25, language: 0.15 },
+    desc: 'Von deinen eigenen Modellen erzeugt und gefiltert.', research: 'synthetic-data', year: 2024.3,
+  },
+  'agent-trajectories': {
+    name: 'Agent-Trajektorien', cost: 8000000, tokens: 3e11, quality: 0.95, tags: ['text'], upsample: 30,
+    mix: { coding: 0.45, reasoning: 0.45, math: 0.1 },
+    desc: 'Mitschnitte von Agents, die echte Aufgaben lösen.', research: 'agents', year: 2025.3,
   },
 };

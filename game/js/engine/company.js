@@ -56,18 +56,23 @@ export function canBuyHardware(state, id) {
   return null;
 }
 
-export function buyHardware(state, id) {
-  if (canBuyHardware(state, id)) return;
-  state.money -= HARDWARE[id].cost;
-  state.hardware[id] = (state.hardware[id] || 0) + 1;
+export function buyHardware(state, id, n = 1) {
+  let bought = 0;
+  while (bought < n && !canBuyHardware(state, id)) {
+    state.money -= HARDWARE[id].cost;
+    state.hardware[id] = (state.hardware[id] || 0) + 1;
+    bought++;
+  }
+  return bought;
 }
 
-export function sellHardware(state, id) {
+export function sellHardware(state, id, n = 1) {
   const h = HARDWARE[id];
   if (!state.hardware[id] || h.sellable === false) return;
-  state.hardware[id]--;
+  const k = Math.min(n, state.hardware[id]);
+  state.hardware[id] -= k;
   if (!state.hardware[id]) delete state.hardware[id];
-  state.money += h.cost * ECONOMY.sellRefund;
+  state.money += h.cost * ECONOMY.sellRefund * k;
 }
 
 export function canMove(state, id) {
@@ -97,12 +102,12 @@ export function canHire(state, role) {
   return null;
 }
 
-export function hire(state, role) {
-  if (!canHire(state, role)) state.staff[role]++;
+export function hire(state, role, n = 1) {
+  for (let i = 0; i < n && !canHire(state, role); i++) state.staff[role]++;
 }
 
-export function fire(state, role) {
-  if (state.staff[role] > 0) state.staff[role]--;
+export function fire(state, role, n = 1) {
+  state.staff[role] = Math.max(0, state.staff[role] - n);
 }
 
 export function hostingCost(model) {

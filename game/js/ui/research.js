@@ -1,6 +1,8 @@
 import { RESEARCH_TREE } from '../../config/research.js';
 import { btn, h2, bar, chip } from './components.js';
-import { isDone, isAvailable, pointsPerWeek } from '../engine/research.js';
+import { isDone, isAvailable, pointsPerWeek, tooEarly } from '../engine/research.js';
+import { date } from '../util/format.js';
+import { WEEKS_PER_YEAR, START } from '../../config/formulas.js';
 
 export function researchView(state) {
   const ppw = pointsPerWeek(state);
@@ -19,7 +21,7 @@ export function researchView(state) {
       <div class="row"><div class="grow"><div class="title">${n.name}</div><div class="sub">${n.desc}</div></div>
       ${mode !== 'done' ? `<div class="right sub">${n.cost} P<br>~${weeks} Wo</div>` : ''}</div>
       ${isCur ? bar(state.research.progress / n.cost) : ''}
-      ${mode === 'locked' ? `<div class="chips">${missing.map((m) => chip('braucht ' + m)).join('')}</div>` : ''}
+      ${mode === 'locked' ? `<div class="chips">${missing.map((m) => chip('braucht ' + m)).join('')}${tooEarly(state, id) ? chip(`ab ${date(Math.ceil((n.year - START.year) * WEEKS_PER_YEAR))}`, 'amber') : ''}</div>` : ''}
       ${mode === 'avail' && !isCur ? `<div class="btns">${btn(cur ? 'Wechseln (Fortschritt geht verloren)' : 'Erforschen', 'research', { id }, { cls: cur ? 'ghost small' : 'small' })}</div>` : ''}
     </div>`;
   };

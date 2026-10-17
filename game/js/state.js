@@ -1,7 +1,8 @@
 import { START } from '../config/formulas.js';
+import { INFERENCE } from '../config/products.js';
 
 export const SAVE_KEY = 'aicg-save';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export function newGame(seed = Date.now()) {
   return {
@@ -19,7 +20,12 @@ export function newGame(seed = Date.now()) {
     models: [],
     training: null,
     contracts: [],
-    apps: {},             // task -> modelId
+    apps: {},             // task -> modelId (nur kleine Modelle, LLMs laufen über Produkte)
+    chat: { modelId: null, price: 20, free: 0, paid: 0 },
+    api: { modelId: null, price: 20, tokens: 0 },
+    openSourced: [],
+    inferenceShare: INFERENCE.defaultShare,
+    overloadWarned: false,
     seenRivals: 0,
     nextId: 1,
     negWeeks: 0,
@@ -30,8 +36,10 @@ export function newGame(seed = Date.now()) {
 }
 
 function migrate(s) {
-  // Zukünftige Versionen: hier Felder ergänzen
-  return { ...newGame(), ...s, version: SAVE_VERSION };
+  // Neue Felder kommen aus newGame(), alte Werte bleiben erhalten
+  const out = { ...newGame(), ...s, version: SAVE_VERSION };
+  if ((s.version || 1) < 2) delete out.apps.llm;   // v1: LLM-App → jetzt Chat/API-Produkte
+  return out;
 }
 
 export function load() {

@@ -12,7 +12,7 @@ export function moreView(state) {
     <div class="card">${state.log.map((l) => `<div class="log"><span class="w">Wo ${l.week}</span><span>${F.esc(l.text)}</span></div>`).join('') || empty('Noch nichts passiert.')}</div>
 
     ${h2('Info')}
-    <div class="card"><div class="sub">AI Company · v0.1 (M1). 1 Runde = 1 Woche, ein Spieljahr hat 26 Wochen. Alle Balancing-Werte liegen in <code>game/config/</code>.</div></div>
+    <div class="card"><div class="sub">AI Company · v0.2 (M2). 1 Runde = 1 Woche, ein Spieljahr hat 26 Wochen. Alle Balancing-Werte liegen in <code>game/config/</code>.</div></div>
   `;
 }
 

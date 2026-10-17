@@ -1,12 +1,29 @@
-import { RIVAL_RELEASES, COMPANIES } from '../../config/rivals.js';
+import { RIVAL_RELEASES, COMPANIES, FUTURE } from '../../config/rivals.js';
 import { WEEKS_PER_YEAR, START } from '../../config/formulas.js';
 import { SKILLS } from '../../config/tasks.js';
+
+// Fiktive Releases einmal vorberechnen (deterministisch, nicht im Spielstand)
+function futureReleases() {
+  const out = [];
+  for (const [company, f] of Object.entries(FUTURE.series)) {
+    for (let i = 0, y = FUTURE.start + f.phase; y < FUTURE.end; i++, y += f.every) {
+      const base = FUTURE.ceiling - (FUTURE.ceiling - FUTURE.startScore) * Math.exp(-(y - FUTURE.start) / FUTURE.tau) + f.offset;
+      const v = f.version + i * f.step;
+      const scores = {};
+      for (const [k, b] of Object.entries(FUTURE.bias[company])) scores[k] = Math.min(100, base + b);
+      out.push({ company, name: `${f.prefix}${Number.isInteger(v) ? v : v.toFixed(1)}`, year: y, scores });
+    }
+  }
+  return out;
+}
+
+const ALL_RELEASES = [...RIVAL_RELEASES, ...futureReleases()].sort((a, b) => a.year - b.year);
 
 const releaseWeek = (r) => Math.round((r.year - START.year) * WEEKS_PER_YEAR);
 const overall = (scores) => Object.values(scores).reduce((a, b) => a + b, 0) / Object.keys(scores).length;
 
 export function releasedRivals(state) {
-  return RIVAL_RELEASES.filter((r) => releaseWeek(r) <= state.week)
+  return ALL_RELEASES.filter((r) => releaseWeek(r) <= state.week)
     .map((r) => ({ ...r, score: overall(r.scores), companyName: COMPANIES[r.company].name, week: releaseWeek(r) }));
 }
 
@@ -40,3 +57,14 @@ export function leaderboard(state, key = 'score') {
 }
 
 export const SKILL_KEYS = Object.keys(SKILLS);
+
+// Marktanteil eines Scores gegen das beste Modell jeder Rivalen-Firma
+export function llmShare(state, score, exp = 3) {
+  const mine = Math.pow(score, exp);
+  const others = rivalTopScores(state).reduce((a, r) => a + Math.pow(r.score, exp), 0);
+  return mine + others > 0 ? mine / (mine + others) : 0;
+}
+
+export function bestRivalScore(state) {
+  return rivalTopScores(state).reduce((a, r) => Math.max(a, r.score), 0);
+}

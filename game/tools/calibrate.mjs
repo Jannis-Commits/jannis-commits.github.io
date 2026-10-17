@@ -3,20 +3,27 @@ import { newGame } from '../js/state.js';
 import { analyze } from '../js/engine/training.js';
 import { RESEARCH_TREE } from '../config/research.js';
 
-const s = newGame(1);
-s.research.done = Object.keys(RESEARCH_TREE).filter((k) => !['moe'].includes(k));
-s.hardware = { 'dc-a': 100 };
+const ALL = Object.keys(RESEARCH_TREE);
+const upTo = (ids) => ALL.slice(0, ALL.indexOf(ids) + 1);
 const cases = [
-  ['spam', ['sms-spam'], [1e5, 3e5, 1e6]], ['spam', ['enron-spam'], [1e6, 3e6, 1e7]],
-  ['digits', ['mnist'], [1e5, 1e6, 1e7, 1e8]],
-  ['recommender', ['movie-ratings'], [1e6, 1e7, 1e8]], ['recommender', ['movie-ratings', 'shop-logs'], [1e7, 1e8, 1e9]],
-  ['chatbot', ['dialog-scripts'], [1e6, 1e7]], ['chatbot', ['dialog-scripts', 'movie-subs'], [1e7, 1e8]],
-  ['image', ['imagenet'], [1e7, 1e8, 1e9]],
-  ['llm', ['newsgroups', 'wikipedia'], [1e8, 1e9]], ['llm', ['web-crawl', 'books', 'github-code'], [1e9, 1e10, 1e11]],
-  ['llm', ['curated-web'], [1e10, 1e11]],
+  // [Forschung bis, task, datasets, params, arch]
+  ['moe', 'spam', ['enron-spam'], 1e6],
+  ['moe', 'image', ['imagenet'], 1e8],
+  ['transformer', 'llm', ['newsgroups', 'wikipedia'], 1e9],
+  ['transformer', 'llm', ['web-crawl', 'books', 'github-code'], 1e10],
+  ['moe', 'llm', ['web-crawl', 'books', 'github-code'], 1.75e11],       // ~GPT-3
+  ['rlhf', 'llm', ['curated-web', 'books', 'github-code', 'code-instruct'], 1e11],
+  ['cot', 'llm', ['mega-mix', 'reasoning-traces', 'code-instruct'], 3e11],   // ~GPT-4
+  ['reasoning', 'llm', ['mega-mix', 'synthetic', 'reasoning-traces', 'code-instruct'], 1e12, 'moe'],
+  ['gigawatt', 'llm', ['mega-mix', 'synthetic', 'reasoning-traces', 'code-instruct', 'agent-trajectories'], 3e12, 'moe'],
+  ['gigawatt', 'llm', ['mega-mix', 'synthetic', 'reasoning-traces', 'code-instruct', 'agent-trajectories'], 1e13, 'moe'],
 ];
-const noRes = newGame(1); noRes.hardware = { 'dc-a': 100 };
-for (const [task, ds, ps] of cases) for (const p of ps) for (const ep of [1, 3]) {
-  const a = analyze(s, { task, datasets: ds, params: p, epochs: ep, arch: 'dense' });
-  console.log(task.padEnd(12), ds.join('+').padEnd(30), p.toExponential(0), 'ep' + ep, 'L', a.loss.toFixed(2), 'score', a.score.toFixed(0), 'of', a.overfit.toFixed(2), 'fail', a.fail.toFixed(2), 'flops', a.flopsNeeded.toExponential(1));
+for (const [res, task, ds, p, arch = 'dense'] of cases) {
+  const s = newGame(1);
+  s.research.done = upTo(res);
+  s.hardware = { 'dc-h': 10000 };
+  const a = analyze(s, { task, datasets: ds, params: p, epochs: 1, arch });
+  const sk = a.skills ? Object.values(a.skills).map((v) => v.toFixed(0)).join('/') : '';
+  console.log(res.padEnd(12), task.padEnd(5), ds.join('+').slice(0, 52).padEnd(52), p.toExponential(1), arch.padEnd(5),
+    'score', a.score.toFixed(1).padStart(5), sk.padEnd(12), 'flops', a.flopsNeeded.toExponential(1), 'wo', a.weeks);
 }

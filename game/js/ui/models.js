@@ -31,7 +31,9 @@ function modelCard(state, m) {
     return `<div class="card dim"><div class="row"><div class="ico">${t.icon}</div><div class="grow"><div class="title">${F.esc(m.name)}</div>
       <div class="sub">Gescheitert · ${F.params(m.params)}</div></div>${btn('🗑', 'deleteModel', { id: m.id }, { cls: 'ghost small' })}</div></div>`;
   }
-  const live = state.apps[m.task] === m.id;
+  const isLlm = m.task === 'llm';
+  const products = isLlm ? [state.chat.modelId === m.id && 'Chat', state.api.modelId === m.id && 'API', state.openSourced.includes(m.id) && 'Open Source'].filter(Boolean) : [];
+  const live = isLlm ? products.length > 0 : state.apps[m.task] === m.id;
   const q8 = canQuantize(state, m, 8), q4 = canQuantize(state, m, 4);
   const showQ = effects(state).features.has('quantize');
   return `<div class="card ${live ? 'hl' : ''}">
@@ -39,10 +41,12 @@ function modelCard(state, m) {
       <div class="sub">${t.name} · ${F.params(m.params)}${m.arch === 'moe' ? ' · MoE' : ''}${m.bits ? ` · ${m.bits} Bit` : ''}</div></div>
       <div class="right big">${Math.round(m.score)}</div></div>
     ${m.skills ? `<div style="margin-top:8px">${skillsBlock(m.skills)}</div>` : ''}
-    <div class="chips">${live ? chip('App live', 'green') : ''}
-      ${chip(`App: ${F.money(appIncome(state, m))}/Wo`)}${chip(`Hosting: ${F.money(hostingCost(m))}/Wo`)}</div>
+    <div class="chips">${isLlm
+      ? products.map((p) => chip(p, 'green')).join('') + (products.length ? '' : chip('Kein Produkt'))
+      : `${live ? chip('App live', 'green') : ''}${chip(`App: ${F.money(appIncome(state, m))}/Wo`)}${chip(`Hosting: ${F.money(hostingCost(m))}/Wo`)}`}</div>
     <div class="btns">
-      ${live ? btn('App stoppen', 'stopApp', { task: m.task }, { cls: 'ghost small' }) : btn('Als App starten', 'deployApp', { id: m.id }, { cls: 'small' })}
+      ${isLlm ? btn('Produkte', 'goProducts', {}, { cls: 'small' })
+        : live ? btn('App stoppen', 'stopApp', { task: m.task }, { cls: 'ghost small' }) : btn('Als App starten', 'deployApp', { id: m.id }, { cls: 'small' })}
       ${showQ ? btn('8 Bit', 'quantize', { id: m.id, bits: 8 }, { cls: 'ghost small', disabled: !!q8 }) + btn('4 Bit', 'quantize', { id: m.id, bits: 4 }, { cls: 'ghost small', disabled: !!q4 }) : ''}
       ${btn('🗑', 'deleteModel', { id: m.id }, { cls: 'ghost small', disabled: live })}
     </div></div>`;
