@@ -29,54 +29,54 @@ export const RESEARCH_TREE = {
     effects: { maxParams: 1e6 },
   },
   'neural-nets': {
-    name: 'Neuronale Netze', branch: 'basics', cost: 15, req: ['logreg'],
+    name: 'Neuronale Netze', branch: 'basics', cost: 10, req: ['logreg'],
     desc: 'Schaltet Ziffernerkennung frei. Bis 10 million Parameter.',
     effects: { maxParams: 1e7 },
   },
   recsys: {
-    name: 'Collaborative Filtering', branch: 'basics', cost: 25, req: ['logreg'],
+    name: 'Collaborative Filtering', branch: 'basics', cost: 12, req: ['logreg'],
     desc: 'Schaltet Empfehlungssysteme frei.',
     effects: {},
   },
   dialog: {
-    name: 'Dialog-Systeme', branch: 'basics', cost: 30, req: ['logreg'],
+    name: 'Dialog-Systeme', branch: 'basics', cost: 15, req: ['logreg'],
     desc: 'Schaltet Regel-Chatbots frei.',
     effects: {},
   },
   cnn: {
-    name: 'CNNs', branch: 'basics', cost: 60, req: ['neural-nets', 'gpu-training'],
+    name: 'CNNs', branch: 'basics', cost: 30, req: ['neural-nets', 'gpu-training'],
     desc: 'Schaltet Bilderkennung frei, bessere Ziffernerkennung.',
     effects: { taskLoss: { digits: 0.5 } },
   },
   rnn: {
-    name: 'RNNs & LSTMs', branch: 'basics', cost: 60, req: ['neural-nets'],
+    name: 'RNNs & LSTMs', branch: 'basics', cost: 30, req: ['neural-nets'],
     desc: 'Bessere Chatbots durch Sequenzmodelle.',
     effects: { taskLoss: { chatbot: 1 } },
   },
   embeddings: {
-    name: 'Word Embeddings', branch: 'basics', cost: 70, req: ['rnn'],
+    name: 'Word Embeddings', branch: 'basics', cost: 35, req: ['rnn'],
     desc: 'Schaltet Wikipedia frei, bessere Text-Modelle.',
     effects: { taskLoss: { chatbot: 0.5, spam: 1 } },
   },
   attention: {
-    name: 'Attention', branch: 'basics', cost: 120, req: ['rnn', 'embeddings'],
+    name: 'Attention', branch: 'basics', cost: 60, req: ['rnn', 'embeddings'],
     desc: 'Modelle lernen, worauf es ankommt.',
     effects: { taskLoss: { chatbot: 0.5, image: 0.2 } },
   },
   transformer: {
-    name: 'Transformer', branch: 'arch', year: 2017.4, cost: 180, req: ['attention'],
+    name: 'Transformer', branch: 'arch', year: 2017.4, cost: 90, req: ['attention'],
     desc: 'Schaltet Sprachmodelle (LLMs) und große Text-Datasets frei.',
     effects: {},
   },
 
   // ---------- Infrastruktur ----------
   'gpu-training': {
-    name: 'GPU-Training (CUDA)', branch: 'infra', cost: 40, req: ['neural-nets'],
+    name: 'GPU-Training (CUDA)', branch: 'infra', cost: 25, req: ['neural-nets'],
     desc: 'GPUs laufen doppelt so schnell. Workstation-Tower & Profi-GPUs. Bis 100 million Parameter.',
     effects: { maxParams: 1e8, features: ['cuda'] },
   },
   'datacenter-hw': {
-    name: 'Datacenter-Hardware', branch: 'infra', cost: 90, req: ['gpu-training'],
+    name: 'Datacenter-Hardware', branch: 'infra', cost: 60, req: ['gpu-training'],
     desc: 'Rechenzentrums-GPUs, 4U-Server und HGX-Nodes. Bis 1 billion Parameter.',
     effects: { maxParams: 1e9 },
   },
@@ -113,12 +113,12 @@ export const RESEARCH_TREE = {
 
   // ---------- Training ----------
   'grad-ckpt': {
-    name: 'Gradient Checkpointing', branch: 'training', year: 2016.3, cost: 60, req: ['neural-nets'],
+    name: 'Gradient Checkpointing', branch: 'training', year: 2016.3, cost: 30, req: ['neural-nets'],
     desc: 'Aktivierungen −87 % VRAM, dafür +33 % Rechenzeit.',
     effects: { features: ['grad-ckpt'] },
   },
   'mixed-precision': {
-    name: 'Mixed Precision (BF16)', branch: 'training', year: 2017.8, cost: 100, req: ['datacenter-hw'],
+    name: 'Mixed Precision (BF16)', branch: 'training', year: 2017.8, cost: 70, req: ['datacenter-hw'],
     desc: 'Training in 16 Bit: halber Speicher, Tensor Cores voll nutzbar.',
     effects: { features: ['fp16'] },
   },
@@ -187,7 +187,7 @@ export const RESEARCH_TREE = {
 
   // ---------- Post-Training ----------
   distill: {
-    name: 'Distillation', branch: 'post', cost: 50, req: ['neural-nets'],
+    name: 'Distillation', branch: 'post', cost: 30, req: ['neural-nets'],
     desc: 'Großes Modell bringt einem kleinen bei: fast gleich gut, viel billiger zu betreiben.',
     effects: { features: ['distill'] },
   },
@@ -239,7 +239,7 @@ export const RESEARCH_TREE = {
 
   // ---------- Daten ----------
   'data-cleaning': {
-    name: 'Data Cleaning', branch: 'data', cost: 50, req: ['logreg'],
+    name: 'Data Cleaning', branch: 'data', cost: 25, req: ['logreg'],
     desc: '+0,05 Qualität auf alle Datasets.',
     effects: { quality: 0.05 },
   },
@@ -256,7 +256,7 @@ export const RESEARCH_TREE = {
 
   // ---------- Inferenz ----------
   quantization: {
-    name: 'Quantisierung', branch: 'inference', cost: 60, req: ['neural-nets'],
+    name: 'Quantisierung', branch: 'inference', cost: 30, req: ['neural-nets'],
     desc: 'Modelle auf 8/4 Bit verkleinern (naiv): weniger VRAM, schnellere Inferenz.',
     effects: { quantLevel: 1 },
   },

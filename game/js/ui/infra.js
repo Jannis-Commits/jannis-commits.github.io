@@ -7,7 +7,7 @@ import { btn, kv, chip, bar, h2, empty, seg, fchips, row, list, stepper, factor,
 import {
   ROLES, allMachines, machineStats, pool, gpuTf, gpuPrice, partPrice, gpuAvailable, chassisAvailable, defaultBuild,
   machinePrice, canBuyMachine, canDuplicate, canAddGpu, canSwap, canAddPart, partOptions, cloudAvailable, cloudWeekly,
-  usage, flopsPerWeek, utilization,
+  usage, flopsPerWeek, utilization, presetBuilds, canBuyPreset, autoBalancePreview,
 } from '../engine/hardware.js';
 import { location, canMove } from '../engine/company.js';
 
@@ -66,8 +66,23 @@ function machinesView(state) {
 // ---------- Shop ----------
 
 function shopView(state, ui) {
-  const f = ui.shopTab || 'machines';
-  const tabs = fchips([['machines', 'Maschinen'], ['gpus', 'GPUs']], f, 'shopTab');
+  const f = ui.shopTab || 'presets';
+  const tabs = fchips([['presets', '⭐ Fertig-Systeme'], ['machines', 'Selbst bauen'], ['gpus', 'Einzel-GPUs']], f, 'shopTab');
+  if (f === 'presets') {
+    const ps = presetBuilds(state);
+    const cards = ps.map((p) => {
+      const ch = CHASSIS[p.chassis], g = GPUS[p.gpu];
+      const why = canBuyPreset(state, p.chassis, p.gpu);
+      const multi = [10, 100].filter((n) => !canBuyPreset(state, p.chassis, p.gpu, n));
+      return `<div class="card"><div class="row"><div class="ico">${ch.icon}</div><div class="grow">
+        <div class="title">${ch.short} · ${p.config.gpus.length}× ${g.name.replace('GeForce ', '')}</div>
+        <div class="sub">${chip(p.label, p.label === 'Maximum' ? 'amber' : 'green')} ${F.tflops(p.tf)} · ${F.gb(p.vram)} VRAM · ${F.kw(p.heat)}</div></div>
+        <div class="right title">${F.money(p.price)}</div></div>
+        <div class="sub">${CPUS[p.config.cpu].name} · ${F.gb(p.config.ram.reduce((a, r) => a + RAM[r].gb, 0))} RAM · ${COOLING[p.config.cooling].name}</div>
+        <div class="btns">${btn(why || 'Kaufen', 'buyPreset', { c: p.chassis, g: p.gpu, n: 1 }, { disabled: !!why, cls: 'small' })}${multi.map((n) => btn(`×${n}`, 'buyPreset', { c: p.chassis, g: p.gpu, n }, { cls: 'ghost small' })).join('')}</div></div>`;
+    });
+    return `${tabs}${note('Komplett-Systeme: volle GPU-Slots, CPU, RAM, SSDs, Kühlung und Netzteil passend ausgewählt – kein Engpass. Ein Tap, fertig.')}${cards.join('') || empty('Gerade kein Fertig-System verfügbar.')}`;
+  }
   if (f === 'machines') {
     const rows = Object.keys(CHASSIS).filter((id) => chassisAvailable(state, id)).map((id) => {
       const c = CHASSIS[id], b = defaultBuild(state, id), why = canBuyMachine(state, id);
@@ -159,6 +174,13 @@ export function machineSheet(state, ui, sh) {
       ${s.gpus > 1 && ch.ff === 'pcie' ? factor('PCIe-Lanes', s.laneF, s.laneF < 0.97 ? 'CPU mit mehr Lanes' : '') : ''}
       ${s.gpus > 1 ? factor('Multi-GPU', s.intra, ch.ff === 'sxm' ? 'NVLink' : s.intra > 0.9 ? 'NVLink-Brücke' : 'PCIe') : ''}
     </div>` : ''}
+    ${(() => {
+      const ab = autoBalancePreview(state, m.id);
+      if (!ab || !ab.changed.length) return fixed ? '' : note('✓ Keine Engpässe – alles ausbalanciert.', 'blue');
+      return `<div class="card hl"><div class="title">🔧 Auto-Optimieren</div>
+        <div class="sub">Effizienz ${F.pct(ab.before.eff)} → ${F.pct(ab.after.eff)} · tauscht ${ab.changed.map((k) => PART_NAMES[k]).join(', ')}</div>
+        <div class="btns">${btn(state.money < ab.cost ? `Zu wenig Geld (${F.money(ab.cost)})` : `Optimieren (${F.money(ab.cost)})`, 'autoBalance', { id: m.id }, { disabled: state.money < ab.cost, cls: 'small' })}</div></div>`;
+    })()}
     ${ch.gpuSlots ? `<div class="label">GPU-Slots (${m.gpus.length}/${ch.gpuSlots})</div><div class="slots">${slots.join('')}</div>` : ''}
     <div class="label">Komponenten</div>
     ${list([

@@ -85,12 +85,13 @@ export const ECONOMY = {
   defectUsed: 4,                // gebrauchte GPUs fallen 4× so oft aus
   defectHot: 2,                 // überhitzte Maschinen 2× so oft
   repairCost: 0.4,              // Reparatur = 40 % vom Preis
-  salaryGrowth: 0.12,           // Gehälter +12 % (linear) pro Jahr seit Start
+  salaryGrowth: 0.12,           // Gehälter +12 % (linear) pro Jahr ab salaryFrom
+  salaryFrom: 2019,
 };
 
 export const RESEARCH = {
-  founderPoints: 2,
-  researcherPoints: 4,
+  founderPoints: 5,
+  researcherPoints: 6,
   queueMax: 3,
 };
 

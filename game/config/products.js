@@ -29,7 +29,7 @@ export const API = {
   refPriceDrop: 0.6,
   refPriceMin: 0.5,
   priceElasticity: 1.4,
-  maxPriceFactor: 4,
+  maxPriceFactor: 8,          // Budget-Segment: wer billig ist, bekommt auch mit schwächerem Modell Kunden
   codingWeight: 0.5,          // API-Kunden achten zur Hälfte auf Coding
   growth: 0.2,
 };
@@ -48,4 +48,14 @@ export const OPEN_SOURCE = {
 export const INFERENCE = {
   churnPerOverload: 0.15,     // bei 200 % Last verlierst du 15 % der Nutzer pro Woche
   repLossOverload: 0.5,
+};
+
+// Fach-Märkte: Unternehmen zahlen für Spezialisten (Medizin, Recht, Software, Support).
+// Marktgröße in $/Woche je Fachgebiet: max / (1 + exp(-(Jahr - mid) * k)). Konkurrenz: Generalisten-Rivalen × rivalFactor.
+// Bedient werden sie von den Modellen in Chat oder API (das beste pro Fachgebiet zählt).
+export const DOMAIN_MARKET = {
+  max: 3e6,
+  mid: 2024.5,
+  k: 0.9,
+  rivalFactor: 0.6,
 };

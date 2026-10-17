@@ -448,3 +448,179 @@ export function defectChance(state, m, g) {
   const infra = 1 - Math.min(state.staff.infra * STAFF_FX.infraDefect, STAFF_FX.infraDefectCap);
   return ECONOMY.defectPerGpu * (g.used ? ECONOMY.defectUsed : 1) * (s.hot ? ECONOMY.defectHot : 1) * infra;
 }
+
+// ---------- Komfort: ausbalancierte Builds, Auto-Optimieren, Fertig-Konfigurationen ----------
+
+const clone = (m) => ({ ...m, ram: [...m.ram], storage: [...m.storage], gpus: m.gpus.map((g) => ({ ...g })) });
+
+const gpuValue = (state, id) => (gpuTf(GPUS[id], 'fp16') * Math.pow(GPUS[id].vram, 0.3)) / Math.max(1, gpuPrice(state, id));
+
+// GPU mit bestem Preis-Leistungs-Verhältnis bzw. die stärkste für einen Steckplatz-Typ
+export function valueGpu(state, ff) {
+  return Object.keys(GPUS).filter((id) => GPUS[id].ff === ff && gpuAvailable(state, id)).sort((a, b) => gpuValue(state, b) - gpuValue(state, a))[0];
+}
+
+export function topGpu(state, ff) {
+  return Object.keys(GPUS).filter((id) => GPUS[id].ff === ff && gpuAvailable(state, id))
+    .sort((a, b) => gpuTf(GPUS[b], 'fp16') - gpuTf(GPUS[a], 'fp16') || GPUS[b].vram - GPUS[a].vram)[0];
+}
+
+function cheapestPart(state, kind, cls, ok) {
+  const ids = Object.keys(PARTS[kind]).filter((id) => partAvailable(state, kind, id, cls));
+  return ids.filter((id) => ok(PARTS[kind][id])).sort((a, b) => partPrice(state, kind, a) - partPrice(state, kind, b))[0];
+}
+
+function strongestPart(state, kind, cls, key) {
+  return Object.keys(PARTS[kind]).filter((id) => partAvailable(state, kind, id, cls)).sort((a, b) => PARTS[kind][b][key] - PARTS[kind][a][key])[0];
+}
+
+// Gleiche Maschine, aber alle Engpässe behoben (günstigste Teile, die reichen)
+export function balanceConfig(state, m0, { nic = false } = {}) {
+  const m = clone(m0), ch = CHASSIS[m.chassis];
+  if (ch.fixed) return m;
+  const cls = ch.cls, cpuN = ch.cpuCount || 1;
+  for (let i = 0; i < 4; i++) {
+    let s = machineStats(state, m);
+    if (s.gpus && (s.cpuF < 0.97 || s.laneF < 0.97)) {
+      const lanes = ch.ff === 'pcie' ? Math.min(128, (16 * s.gpus) / cpuN) : 0;
+      const c = cheapestPart(state, 'cpu', cls, (p) => p.feed * cpuN >= s.raw && p.lanes >= lanes) || strongestPart(state, 'cpu', cls, 'feed');
+      if (c && c !== m.cpu) {
+        if (CPUS[c].mem !== CPUS[m.cpu].mem) m.ram = [];
+        m.cpu = c;
+      }
+    }
+    s = machineStats(state, m);
+    const mem = CPUS[m.cpu].mem;
+    const targetRam = Math.max(s.gpus ? s.vramTotal : 16, 8);
+    if (!m.ram.length || (s.gpus && s.ramGb < targetRam)) {
+      const mods = Object.keys(RAM).filter((id) => RAM[id].mem === mem && partAvailable(state, 'ram', id, cls));
+      let best = null;
+      for (const id of mods) {
+        const n = Math.ceil(targetRam / RAM[id].gb);
+        if (n > ch.ramSlots) continue;
+        const cost = n * partPrice(state, 'ram', id);
+        if (!best || cost < best.cost) best = { id, n, cost };
+      }
+      if (!best && mods.length) {
+        const big = mods.sort((a, b) => RAM[b].gb - RAM[a].gb)[0];
+        best = { id: big, n: ch.ramSlots };
+      }
+      if (best) m.ram = Array(best.n).fill(best.id);
+    }
+    s = machineStats(state, m);
+    if (!m.storage.length || s.storF < 0.97) {
+      const drives = Object.keys(STORAGE).filter((id) => partAvailable(state, 'storage', id, cls));
+      let best = null;
+      for (const id of drives) {
+        const n = Math.max(1, Math.ceil(Math.max(s.raw, 1) / STORAGE[id].feed));
+        if (n > ch.storSlots) continue;
+        const cost = n * partPrice(state, 'storage', id);
+        if (!best || cost < best.cost) best = { id, n, cost };
+      }
+      if (!best) best = { id: strongestPart(state, 'storage', cls, 'feed'), n: ch.storSlots };
+      if (best.id) m.storage = Array(best.n).fill(best.id);
+    }
+    s = machineStats(state, m);
+    if (s.heat > COOLING[m.cooling].kw) {
+      m.cooling = cheapestPart(state, 'cooling', cls, (p) => p.kw >= s.heat * 1.05) || strongestPart(state, 'cooling', cls, 'kw');
+    }
+    if (s.heat > PSU[m.psu].kw * 0.98) {
+      m.psu = cheapestPart(state, 'psu', cls, (p) => p.kw >= s.heat * 1.1) || strongestPart(state, 'psu', cls, 'kw');
+    }
+  }
+  if (nic) {
+    const best = strongestPart(state, 'nic', cls, 'eff');
+    if (best && NIC[best].eff > NIC[m.nic].eff) m.nic = best;
+  }
+  return m;
+}
+
+// Kosten, um von einer Konfiguration zur anderen zu kommen (pro Maschine): neue Teile minus Verkaufserlös der alten
+export function changeCost(state, from, to) {
+  const ch = CHASSIS[from.chassis];
+  let cost = 0;
+  const single = (kind, mult = 1) => {
+    if (from[kind] === to[kind]) return;
+    cost += (partPrice(state, kind, to[kind]) - partPrice(state, kind, from[kind]) * ECONOMY.sellRefund) * mult;
+  };
+  single('cpu', ch.cpuCount || 1); single('cooling'); single('psu'); single('nic', ch.nicCount || 1);
+  for (const kind of ['ram', 'storage']) {
+    const rest = [...from[kind]];
+    for (const id of to[kind]) {
+      const i = rest.indexOf(id);
+      if (i >= 0) rest.splice(i, 1); else cost += partPrice(state, kind, id);
+    }
+    for (const id of rest) cost -= partPrice(state, kind, id) * ECONOMY.sellRefund;
+  }
+  return Math.round(cost);
+}
+
+export function autoBalancePreview(state, id) {
+  const m = group(state, id);
+  if (!m || CHASSIS[m.chassis].fixed) return null;
+  const to = balanceConfig(state, m, { nic: m.count > 1 || pool(state, 'train').machines > 1 });
+  const keys = ['cpu', 'cooling', 'psu', 'nic', 'ram', 'storage'];
+  const changed = keys.filter((k) => JSON.stringify(m[k]) !== JSON.stringify(to[k]));
+  if (!changed.length) return { changed, cost: 0, to, before: machineStats(state, m), after: machineStats(state, m) };
+  return { changed, cost: changeCost(state, m, to) * m.count, to, before: machineStats(state, m), after: machineStats(state, to) };
+}
+
+export function autoBalance(state, id) {
+  const p = autoBalancePreview(state, id);
+  if (!p || !p.changed.length) return 'Schon optimal';
+  if (state.money < p.cost) return 'Zu wenig Geld';
+  const m = group(state, id);
+  const dHeat = (p.after.heat - p.before.heat) * m.count;
+  if (dHeat > 0 && usage(state).power + dHeat > loc(state).power) return 'Zu wenig Strom am Standort';
+  for (const k of p.changed) m[k] = Array.isArray(p.to[k]) ? [...p.to[k]] : p.to[k];
+  state.money -= p.cost;
+  state.stats.upgrades++;
+  return null;
+}
+
+// Fertig-Konfigurationen: Gehäuse + volle GPU-Slots + ausbalancierte Teile
+export function presetBuilds(state) {
+  const out = [];
+  for (const chassis of Object.keys(CHASSIS)) {
+    const ch = CHASSIS[chassis];
+    if (!ch.gpuSlots || !chassisAvailable(state, chassis) || !loc(state).classes.includes(ch.cls)) continue;
+    const gpus = [...new Set([valueGpu(state, ch.ff), topGpu(state, ch.ff)].filter(Boolean))];
+    for (const [i, gpu] of gpus.entries()) {
+      const p = presetConfig(state, chassis, gpu);
+      if (!p) continue;
+      const s = machineStats(state, p);
+      out.push({ chassis, gpu, label: gpus.length > 1 ? (i ? 'Maximum' : 'Preis-Leistung') : 'Empfohlen', config: p, price: machinePrice(state, p), tf: s.tf, vram: s.vramTotal, heat: s.heat });
+    }
+  }
+  return out;
+}
+
+export function presetConfig(state, chassis, gpu) {
+  const b = defaultBuild(state, chassis);
+  if (!b) return null;
+  b.gpus = Array(CHASSIS[chassis].gpuSlots).fill(0).map(() => ({ id: gpu, used: false }));
+  return balanceConfig(state, b);
+}
+
+export function canBuyPreset(state, chassis, gpu, n = 1) {
+  const ch = CHASSIS[chassis];
+  if (!chassisAvailable(state, chassis) || !gpuAvailable(state, gpu)) return 'Nicht verfügbar';
+  if (!loc(state).classes.includes(ch.cls)) return 'Standort zu klein';
+  const p = presetConfig(state, chassis, gpu);
+  if (!p) return 'Nicht verfügbar';
+  if (state.money < machinePrice(state, p) * n) return 'Zu wenig Geld';
+  return fitsLocation(state, ch.space * n, machineStats(state, p).heat * n);
+}
+
+export function buyPreset(state, chassis, gpu, n = 1) {
+  if (canBuyPreset(state, chassis, gpu, n)) return null;
+  const p = presetConfig(state, chassis, gpu);
+  state.money -= machinePrice(state, p) * n;
+  const keyOf = (m) => JSON.stringify([m.chassis, m.cpu, m.cooling, m.psu, m.nic, m.ram, m.storage, m.gpus.map((g) => g.id + (g.used ? '*' : ''))]);
+  const same = state.machines.find((m) => keyOf(m) === keyOf(p) && m.role === 'train');
+  if (same) { same.count += n; return same; }
+  const short = GPUS[gpu].name.replace('GeForce ', '').replace('AMD Instinct ', '');
+  const m = { id: state.nextId++, name: `${CHASSIS[chassis].short} ${short}`, ...p, count: n, role: 'train' };
+  state.machines.push(m);
+  return m;
+}

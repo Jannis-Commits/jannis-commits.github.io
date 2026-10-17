@@ -1,15 +1,17 @@
 import { START } from '../config/formulas.js';
 import { DEFAULTS } from '../config/parts.js';
+import { DIFFICULTY, DEFAULT_DIFFICULTY } from '../config/difficulty.js';
 
 export const SAVE_KEY = 'aicg-save-v3';
 export const OLD_SAVE_KEY = 'aicg-save';
 export const SAVE_VERSION = 3;
 
-export function newGame(seed = Date.now()) {
+export function newGame(seed = Date.now(), difficulty = DEFAULT_DIFFICULTY) {
   return {
     version: SAVE_VERSION,
+    difficulty,
     week: 0,
-    money: START.money,
+    money: DIFFICULTY[difficulty]?.money ?? START.money,
     rng: seed | 0,
     rep: 0,
     location: START.location,
@@ -33,6 +35,8 @@ export function newGame(seed = Date.now()) {
     goal: 0,
     pending: [],               // Ereignisse mit Entscheidung
     stats: { delivered: 0, upgrades: 0 },
+    subs: [],                  // Stammkunden: { id, client, task, weekly, until }
+    settings: { autoResearch: true, autoQuant: true, autoScale: true },
     overloadWarned: false,
     seenRivals: 0,
     nextId: 2,

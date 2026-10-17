@@ -2,6 +2,7 @@ import { ROUNDS } from '../../config/funding.js';
 import { gameYear } from '../util/format.js';
 import { weeklyIncome } from './market.js';
 import { totalUsers } from './products.js';
+import { diff } from './difficulty.js';
 
 // Finanzierungsrunden: eine nach der anderen, sobald die Bedingungen erfüllt sind.
 
@@ -25,12 +26,14 @@ export const canRaise = (state) => !!nextRound(state) && roundChecks(state).ever
 export function raise(state) {
   if (!canRaise(state)) return null;
   const r = nextRound(state);
-  state.money += r.money;
+  const amount = roundMoney(state, r);
+  state.money += amount;
   state.funding.equity *= 1 - r.equity;
-  state.funding.raised += r.money;
+  state.funding.raised += amount;
   state.funding.round++;
-  state.funding.history.push({ id: r.id, week: state.week, money: r.money, equity: r.equity });
-  return r;
+  state.funding.history.push({ id: r.id, week: state.week, money: amount, equity: r.equity });
+  return { ...r, money: amount };
 }
 
-export const valuation = (r) => r.money / r.equity;
+export const roundMoney = (state, r) => Math.round(r.money * diff(state).funding);
+export const valuation = (state, r) => roundMoney(state, r) / r.equity;

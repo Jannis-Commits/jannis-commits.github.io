@@ -2,9 +2,18 @@ import { TASKS } from '../../config/tasks.js';
 import { METHODS } from '../../config/pipeline.js';
 import * as F from '../util/format.js';
 import { btn, kv, chip, bar, h2, row, list, section, spark, stat, note, empty } from './components.js';
+
+const attrs = (o) => Object.entries(o).map(([k, v]) => ` data-${k}="${F.esc(v)}"`).join('');
+
+export function advisorCard(state) {
+  const s = nextStep(state);
+  return `<div class="advisor"><div class="row"><span class="ico">${s.icon}</span><span class="grow"><span class="k">Empfohlen</span><b>${s.title}</b><span class="sub">${s.why}</span></span></div>
+    <button class="btn block" data-act="${s.act}"${attrs(s.data)}>${s.label}</button></div>`;
+}
 import { alerts } from '../engine/alerts.js';
 import { currentGoal } from '../engine/goals.js';
-import { weeklyIncome } from '../engine/market.js';
+import { weeklyIncome, incomeBreakdown } from '../engine/market.js';
+import { nextStep } from '../engine/advisor.js';
 import { weeklyCosts } from '../engine/company.js';
 import { pool, flopsPerWeek } from '../engine/hardware.js';
 import { pointsPerWeek } from '../engine/research.js';
@@ -14,7 +23,7 @@ import { leaderboard } from '../engine/rivals.js';
 import { RESEARCH_TREE } from '../../config/research.js';
 
 export function homeView(state, ui) {
-  const income = weeklyIncome(state), costs = weeklyCosts(state);
+  const income = weeklyIncome(state), costs = weeklyCosts(state), inc = incomeBreakdown(state);
   const tp = pool(state, 'train');
   const g = currentGoal(state);
   const rank = leaderboard(state).findIndex((r) => r.mine) + 1;
@@ -36,18 +45,22 @@ export function homeView(state, ui) {
   }
 
   const log = state.log.slice(0, 12).map((l) => `<div class="log"><span class="w">Wo ${l.week}</span><span>${F.esc(l.text)}</span></div>`).join('');
+  const incRows = [['📱 Apps', inc.apps], ['🤝 Stammkunden', inc.subs], ['💬 Chat-Abos', inc.chat], ['🔌 API', inc.api], ['🩺 Fach-Märkte', inc.domains]]
+    .map(([k, v]) => kv(k, F.money(v), v > 0 ? 'good' : '')).join('');
   return `
+    ${state.gameOver ? '' : advisorCard(state)}
     <div class="stats">
       ${stat('Einnahmen/Wo', `<span class="good">${F.money(income)}</span>`)}
       ${stat('Kosten/Wo', `<span class="bad">${F.money(costs.total)}</span>`)}
       ${stat('Training', F.tflops(tp.tf), tp.machines ? `${tp.gpus} ${tp.cpuOnly ? 'CPU' : 'GPU'} · ${F.flops(flopsPerWeek(state, tp.tf))}/Wo` : 'keine Maschine')}
       ${stat('Forschung', `${pointsPerWeek(state)} P/Wo`, `Ruf ${Math.round(state.rep)} · ${totalUsers(state) ? F.count(Math.round(totalUsers(state))) + ' Nutzer' : rank ? `Rang ${rank}` : 'noch kein Ranking'}`)}
     </div>
-    ${g ? `<div class="goal"><span class="ico">🎯</span><span class="grow"><span class="sub">Nächstes Ziel</span><b>${g.text}</b></span>${g.reward ? chip(`+${F.money(g.reward)}`, 'green') : ''}</div>` : ''}
+    ${g ? `<div class="goal"><span class="ico">🎯</span><span class="grow"><span class="sub">Meilenstein</span><b>${g.text}</b><span class="why">${g.why}</span></span>${g.reward ? chip(`+${F.money(g.reward)}`, 'green') : ''}</div>` : ''}
     ${h2('To-do')}
     ${al.length ? list(al.map((a) => row({ icon: a.icon, title: a.text, act: a.act, data: a.data, cls: `al-${a.level}` }))) : note('Alles läuft. Drück auf „Nächste Woche“.', 'blue')}
     ${h2('Läuft gerade')}
     ${jobs.join('') || empty('Weder Training noch Forschung aktiv.')}
+    ${section(ui, 'home-inc', `Einnahmen pro Woche · ${F.money(income)}`, `<div class="card tight">${incRows}${kv('Aufträge', 'einmalig beim Liefern')}</div>`, { open: false })}
     ${section(ui, 'home-log', 'Logbuch', log || empty('Noch nichts passiert.'), { count: state.log.length })}
   `;
 }

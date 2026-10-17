@@ -8,6 +8,7 @@ import { pool, flopsPerWeek } from './hardware.js';
 import { trainMemory, memoryTips, activeParams } from './memory.js';
 import { releaseModel } from './products.js';
 import { rand } from '../util/rng.js';
+import { diff } from './difficulty.js';
 
 // ---------- Hilfen ----------
 
@@ -202,6 +203,7 @@ export function plan(state, spec) {
     }
   }
   out.result = result;
+  flops /= diff(state).trainEff;
   out.flopsNeeded = flops;
   out.overfit = overfit;
   out.weeks = perWeek > 0 ? Math.max(minWeeks, Math.ceil(flops / perWeek)) : Infinity;
@@ -218,6 +220,9 @@ export function validate(state, spec, p) {
   if (state.job) return 'Es läuft schon ein Training';
   if (!p.pl.machines) return 'Keine Maschine mit Rolle „Training“ (Infra-Tab)';
   if (spec.precision !== 'fp32' && !has(state, PRECISION[spec.precision].feature)) return 'Präzision nicht erforscht';
+  if (spec.sharding !== 'none' && !has(state, spec.sharding)) return `${spec.sharding.toUpperCase()} nicht erforscht`;
+  if (spec.ckpt && !has(state, 'grad-ckpt')) return 'Gradient Checkpointing nicht erforscht';
+  if (spec.offload && !has(state, 'offload')) return 'CPU-Offload nicht erforscht';
   if (spec.kind === 'pretrain') {
     if (!taskUnlocked(state, spec.task)) return 'Modell-Typ nicht erforscht';
     if (!spec.datasets.length) return 'Wähle mindestens ein Dataset';
@@ -370,7 +375,7 @@ function finishJob(state, events, p) {
   Object.assign(m, {
     task: r.task, params: r.params, arch: r.arch, activeShare: r.activeShare, loss, fpLoss: j.spec.kind === 'post' ? r.fpLoss : loss,
     mix: r.mix, capMult, skillBonus: r.skillBonus || {}, domainF: r.domainF || {}, chat: !!r.chat,
-    stages: r.stages || ['base'], status: 'ready', evaluated: r.task !== 'llm',
+    stages: r.stages || ['base'], status: 'ready', evaluated: r.task !== 'llm', finished: state.week,
     evalNoise: r.task === 'llm' ? Math.round((rand(state) * 2 - 1) * EVAL.noise) : 0,
   });
   Object.assign(m, evaluate(state, m.task, m.loss, m.mix, m));

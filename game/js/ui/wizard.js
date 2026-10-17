@@ -8,6 +8,7 @@ import {
   plan, taskUnlocked, datasetsFor, postDatasets, readyModels, findModel, methodAllowed, adapterAllowed, maxParamIdx, domainScore, shownScore,
 } from '../engine/training.js';
 import { has } from '../engine/research.js';
+import { recommendTraining } from '../engine/advisor.js';
 
 import { stageBadges } from './lab.js';
 
@@ -24,6 +25,14 @@ const bestBase = (state) => readyModels(state).filter((m) => m.task === 'llm' &&
 export function fitIdx(state, datasets) {
   const tokens = datasets.reduce((a, id) => a + DATASETS[id].tokens, 0);
   return Math.max(0, Math.min(maxParamIdx(state), PARAM_STEPS.filter((p) => p * SCALING.overfitRatio <= tokens).length - 1));
+}
+
+// Formular aus einer fertigen Spezifikation (z. B. der Empfehlung), direkt im Schritt „Start“
+export function formFromSpec(state, spec) {
+  const f = { ...defaultForm(state, spec.kind), ...spec, name: '', step: STEPS[spec.kind].length - 1 };
+  if (spec.kind === 'pretrain') f.pIdx = PARAM_STEPS.indexOf(spec.params);
+  if (spec.kind === 'distill') f.sIdx = PARAM_STEPS.indexOf(spec.params);
+  return f;
 }
 
 export function defaultForm(state, kind, opts = {}) {
@@ -216,7 +225,8 @@ export function wizardSheet(state, ui) {
   }[f.kind][f.step](state, f, p);
   const last = f.step === labels.length - 1;
   const summary = `<div class="wsum">${p.result ? `<span>Score ~${Math.round(p.result.score)}</span>` : ''}<span class="${p.mem.fits ? '' : 'bad'}">VRAM ${F.gb(p.mem.perGpu)}/${F.gb(p.mem.cap)}</span><span>${p.weeks === Infinity ? '–' : p.weeks + ' Wo'}</span></div>`;
-  return `<h3>${TITLE[f.kind]}</h3>
+  const rec = recommendTraining(state);
+  return `<div class="row"><h3 class="grow">${TITLE[f.kind]}</h3>${rec ? btn('✨ Empfehlung', 'applyRec', {}, { cls: 'ghost small' }) : ''}</div>
     ${steps(labels, f.step, 'formStep')}
     ${summary}
     ${body}

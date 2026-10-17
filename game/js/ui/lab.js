@@ -13,6 +13,7 @@ import { appIncome, datasetAvailable } from '../engine/market.js';
 import { hostingCost } from '../engine/company.js';
 import { canOpenSource } from '../engine/products.js';
 import { openReleases } from '../engine/rivals.js';
+import { recommendTraining } from '../engine/advisor.js';
 
 const KIND = { pretrain: 'Pretraining', post: 'Post-Training', distill: 'Distillation' };
 
@@ -137,8 +138,13 @@ function jobCard(state) {
 
 function jobsView(state) {
   const llms = readyModels(state).filter((m) => m.task === 'llm');
-  const start = state.job ? '' : `<div class="card">
-    <div class="title">Neues Training</div>
+  const rec = state.job ? null : recommendTraining(state);
+  const recCard = rec ? `<div class="advisor"><div class="row"><span class="ico">✨</span><span class="grow"><span class="k">Empfohlenes Training</span><b>${F.esc(rec.spec.name)}</b>
+      <span class="sub">${rec.why} · ${rec.p.weeks} Wo · VRAM ${F.gb(rec.p.mem.perGpu)}/${F.gb(rec.p.mem.cap)}</span></span></div>
+      <div class="btns">${btn('Starten', 'startRecommended')}${btn('Anpassen', 'applyRec', {}, { cls: 'ghost' })}</div></div>`
+    : state.job ? '' : note('Gerade passt kein sinnvolles Training auf deine Hardware (VRAM, Daten oder Zeit). Mehr GPUs oder Daten kaufen – oder selbst im Wizard probieren.', 'amber');
+  const start = state.job ? '' : `${recCard}<div class="card">
+    <div class="title">Selbst konfigurieren</div>
     <div class="sub">Pretraining baut ein Basis-Modell. Post-Training macht LLMs chatfähig und schlauer. Distillation schrumpft große Modelle.</div>
     <div class="btns">${btn('Pretraining', 'openWizard', { kind: 'pretrain' })}</div>
     <div class="btns">${btn('Post-Training', 'openWizard', { kind: 'post' }, { cls: 'ghost', disabled: !llms.length || !has(state, 'sft'), title: 'Braucht ein LLM und Instruction Tuning' })}
